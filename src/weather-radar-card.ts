@@ -42,6 +42,12 @@ console.info(
   type: 'weather-radar-card',
   name: 'Weather Radar Card',
   description: 'A rain radar card using tiled imagery from RainViewer, NOAA/NWS, and DWD',
+  // Tell HA's card picker to render a live preview (defaults to false on
+  // unknown custom cards, so without this we get just the name +
+  // description tile — no map. The card uses getStubConfig() below to
+  // pick the preview / initial config.)
+  preview: true,
+  documentationURL: 'https://github.com/Makin-Things/weather-radar-card',
 });
 
 @customElement('weather-radar-card')
@@ -49,7 +55,17 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
     return document.createElement('weather-radar-card-editor') as LovelaceCardEditor;
   }
-  public static getStubConfig(): Record<string, unknown> { return {}; }
+  // Picked by HA's card-picker to render the preview AND used as the
+  // initial config when the user adds the card to a dashboard. Keep
+  // it compact enough to fit the picker pane (~250px tall) but
+  // representative of what the card normally does — RainViewer, home
+  // marker (auto-created by migrateConfig from absent markers[]),
+  // default crossfade. The user tunes from here.
+  public static getStubConfig(): Record<string, unknown> {
+    return {
+      height: '220px',
+    };
+  }
 
   // ── HA properties ────────────────────────────────────────────────────────
 
@@ -126,6 +142,22 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     const cfg = this._config;
     if (cfg.height && this._validateCssSize(cfg.height)) return cfg.height;
     return '400px';
+  }
+
+  /**
+   * Detect whether we're being rendered inside HA's card-add picker.
+   * Walks up through both light DOM and shadow DOM hosts looking for a
+   * `hui-card-picker` ancestor. Hass alone is not a reliable signal —
+   * the picker passes hass through like a normal mount.
+   */
+  private _isInPickerPreview(): boolean {
+    let el: Node | null = this.parentNode ?? (this.getRootNode() as ShadowRoot)?.host ?? null;
+    while (el) {
+      const tag = (el as Element)?.tagName?.toLowerCase?.();
+      if (tag === 'hui-card-picker') return true;
+      el = (el as ShadowRoot).host ?? el.parentNode;
+    }
+    return false;
   }
 
   // ── HA lifecycle ──────────────────────────────────────────────────────────
@@ -278,6 +310,19 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
 
   protected render(): TemplateResult | void {
     if (!this._config) return html``;
+    // Show a static preview image when rendered inside HA's card picker
+    // dialog. Otherwise the picker would hammer the tile API on every
+    // open AND the result looks like an empty map whenever there's no
+    // current rain in the user's area.
+    if (this._isInPickerPreview()) {
+      return html`
+        <ha-card>
+          <img src="/local/community/weather-radar-card/preview.jpg"
+               style="width:100%; display:block; border-radius: var(--ha-card-border-radius, 12px); object-fit: cover;"
+               alt="Weather Radar Card preview" />
+        </ha-card>
+      `;
+    }
     const mapStyle = this._effectiveMapStyle();
     const isMapDark = mapStyle === 'dark' || mapStyle === 'satellite';
     const dataSource = this._config.data_source ?? 'RainViewer';
