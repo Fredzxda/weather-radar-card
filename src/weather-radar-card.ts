@@ -255,6 +255,14 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     this._editorClosedHandler = () => { this._editorOpen = false; };
     window.addEventListener('weather-radar-editor-opened', this._editorOpenedHandler);
     window.addEventListener('weather-radar-editor-closed', this._editorClosedHandler);
+    // Race fix: if the editor already mounted before us (preview card in
+    // the edit dialog — order is up to HA), its 'opened' event has been
+    // and gone. The editor maintains a global mount counter; consult it
+    // so we don't get stuck with _editorOpen=false through the entire
+    // edit session and silently never push pan/zoom back to the form.
+    if ((window as unknown as { __weatherRadarCardEditorCount?: number }).__weatherRadarCardEditorCount) {
+      this._editorOpen = true;
+    }
   }
 
   public disconnectedCallback(): void {

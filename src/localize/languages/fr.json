@@ -64,8 +64,8 @@
       "zoom_default": "Par défaut (5)"
     },
     "time_range": {
-      "past": "Passé",
-      "forecast": "Prévision",
+      "past": "Durée d’historique",
+      "forecast": "Durée de prévision",
       "forecast_off": "Désactivé",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} images à intervalles de {interval} min",

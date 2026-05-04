@@ -64,8 +64,8 @@
       "zoom_default": "Predvolené (5)"
     },
     "time_range": {
-      "past": "Minulosť",
-      "forecast": "Predpoveď",
+      "past": "Trvanie histórie",
+      "forecast": "Trvanie predpovede",
       "forecast_off": "Vypnuté",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} snímok v intervaloch {interval} min",

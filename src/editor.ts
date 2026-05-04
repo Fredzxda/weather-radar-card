@@ -107,14 +107,24 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
     super.connectedCallback();
     window.addEventListener('weather-radar-center-update', this._boundCenterUpdate);
     // Tell every weather-radar-card on the dashboard that *some* editor is
-    // now open. Cards use this to switch from "no edit affordance" to
-    // "auto-propagate pan/zoom into the editor" — see _initMap in the card.
+    // now open. Cards use this to switch on auto-propagate of pan/zoom
+    // into the editor's Lat/Long/Zoom fields — see _initMap in the card.
+    //
+    // Also bump a global mount counter so a preview card that mounts
+    // AFTER us (and therefore missed the 'opened' event) can detect that
+    // an editor is already live and start pushing immediately. Without
+    // this, the back-prop silently never fires for the preview-card +
+    // editor pair when the dialog mounts the editor first.
+    const w = window as unknown as { __weatherRadarCardEditorCount?: number };
+    w.__weatherRadarCardEditorCount = (w.__weatherRadarCardEditorCount ?? 0) + 1;
     window.dispatchEvent(new CustomEvent('weather-radar-editor-opened'));
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener('weather-radar-center-update', this._boundCenterUpdate);
+    const w = window as unknown as { __weatherRadarCardEditorCount?: number };
+    w.__weatherRadarCardEditorCount = Math.max(0, (w.__weatherRadarCardEditorCount ?? 0) - 1);
     window.dispatchEvent(new CustomEvent('weather-radar-editor-closed'));
   }
 

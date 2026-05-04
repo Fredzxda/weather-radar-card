@@ -64,8 +64,8 @@
       "zoom_default": "Standaard (5)"
     },
     "time_range": {
-      "past": "Verleden",
-      "forecast": "Voorspelling",
+      "past": "Historiekduur",
+      "forecast": "Voorspellingsduur",
       "forecast_off": "Uit",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} frames met {interval}-min interval",

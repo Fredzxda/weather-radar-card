@@ -64,8 +64,8 @@
       "zoom_default": "Domyślnie (5)"
     },
     "time_range": {
-      "past": "Przeszłość",
-      "forecast": "Prognoza",
+      "past": "Czas historii",
+      "forecast": "Czas prognozy",
       "forecast_off": "Wyłącz",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} klatek co {interval} min",

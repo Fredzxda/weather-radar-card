@@ -64,8 +64,8 @@
       "zoom_default": "Standard (5)"
     },
     "time_range": {
-      "past": "Förflutet",
-      "forecast": "Prognos",
+      "past": "Historiklängd",
+      "forecast": "Prognoslängd",
       "forecast_off": "Av",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} bilder med {interval}-min intervall",

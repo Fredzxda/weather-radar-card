@@ -65,8 +65,8 @@
       "zoom_default": "Standard (5)"
     },
     "time_range": {
-      "past": "Vergangenheit",
-      "forecast": "Vorhersage",
+      "past": "Verlaufsdauer",
+      "forecast": "Vorhersagedauer",
       "forecast_off": "Aus",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} Bilder, alle {interval} Min.",

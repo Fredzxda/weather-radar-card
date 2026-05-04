@@ -68,8 +68,8 @@
       "zoom_default": "Default (5)"
     },
     "time_range": {
-      "past": "Past Time",
-      "forecast": "Forecast Time",
+      "past": "History Duration",
+      "forecast": "Forecast Duration",
       "forecast_off": "Off",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} frames at {interval}-min intervals",

@@ -64,8 +64,8 @@
       "zoom_default": "Padrão (5)"
     },
     "time_range": {
-      "past": "Passado",
-      "forecast": "Previsão",
+      "past": "Duração do histórico",
+      "forecast": "Duração da previsão",
       "forecast_off": "Desligado",
       "yaml_suffix": "(YAML)",
       "helper": "≈ {n} quadros em intervalos de {interval} min",

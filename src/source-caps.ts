@@ -45,8 +45,11 @@ export const SOURCE_CAPS: Record<string, SourceCaps> = {
   },
   NOAA: {
     intervalMin: 5,
-    maxPastMin: 240,        // mapservices.weather.noaa.gov serves the past four hours
-    editorMaxPastMin: 240,  // = API max
+    // mapservices.weather.noaa.gov advertises 4h of history but in
+    // practice frames > 2h back fail intermittently — observed empty
+    // tiles past that point. Cap at 2h until we understand why.
+    maxPastMin: 120,
+    editorMaxPastMin: 120,
     maxForecastMin: 0,
     defaultPastMin: 60,
     defaultForecastMin: 0,
