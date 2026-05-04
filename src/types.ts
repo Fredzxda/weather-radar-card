@@ -32,7 +32,26 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
   height?: string;
   width?: string;
   extra_labels?: boolean;
+  /** @deprecated since 3.5: use past_minutes (and forecast_minutes for sources that support it). Auto-migrated by migrateConfig. */
   frame_count?: number;
+  /**
+   * How many minutes of history to load. Source-specific defaults apply
+   * when unset. The editor offers presets up to the source's maximum;
+   * YAML can exceed the editor cap (clamped to the source's API limit).
+   */
+  past_minutes?: number;
+  /**
+   * How many minutes of forecast to include in the playback. Only
+   * applies to sources that have a forecast (currently DWD).
+   * Source-specific defaults apply when unset.
+   */
+  forecast_minutes?: number;
+  /**
+   * YAML-only escape hatch for the perf cost of large past_minutes
+   * ranges: forces a custom frame interval (snapped to a multiple of
+   * the source's native interval). Defaults to the native interval.
+   */
+  frame_stride_minutes?: number;
   frame_delay?: number;
   animated_transitions?: boolean;
   transition_time?: number;
@@ -68,9 +87,9 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
   data_source?: string;
   /** DWD-only: ISO timestamp to anchor frames at instead of "now" — for testing with historical rain. */
   dwd_time_override?: string;
-  /** DWD-only: WMS layer name override. Default Niederschlagsradar (past-only); auto-switches to Radar_wn-product_1x1km_ger when dwd_forecast_hours > 0 since that one carries the +2h nowcast. */
+  /** DWD-only: WMS layer name override. Default Niederschlagsradar (past-only); auto-switches to Radar_wn-product_1x1km_ger when forecast_minutes > 0 since that one carries the +2h nowcast. */
   dwd_layer?: string;
-  /** DWD-only: include this many hours of nowcast forecast in the playback range. Default 0. */
+  /** @deprecated since 3.5: use forecast_minutes (source-agnostic). Auto-migrated by migrateConfig. */
   dwd_forecast_hours?: number;
   show_snow?: boolean;
   show_progress_bar?: boolean;

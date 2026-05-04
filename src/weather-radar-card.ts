@@ -12,6 +12,7 @@ import markerClusterCss from 'leaflet.markercluster/dist/MarkerCluster.css';
 import './editor';
 import { WeatherRadarCardConfig, Marker } from './types';
 import { CARD_VERSION, BUILD_TIMESTAMP } from './const';
+import { getEffectiveTimeRange } from './source-caps';
 import { localize } from './localize/localize';
 import { rainviewerLimiter, noaaLimiter, dwdLimiter } from './rate-limiters';
 import { FetchTileLayer } from './fetch-tile-layer';
@@ -254,6 +255,14 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     this._editorClosedHandler = () => { this._editorOpen = false; };
     window.addEventListener('weather-radar-editor-opened', this._editorOpenedHandler);
     window.addEventListener('weather-radar-editor-closed', this._editorClosedHandler);
+    // Race fix: if the editor already mounted before us (preview card in
+    // the edit dialog — order is up to HA), its 'opened' event has been
+    // and gone. The editor maintains a global mount counter; consult it
+    // so we don't get stuck with _editorOpen=false through the entire
+    // edit session and silently never push pan/zoom back to the form.
+    if ((window as unknown as { __weatherRadarCardEditorCount?: number }).__weatherRadarCardEditorCount) {
+      this._editorOpen = true;
+    }
   }
 
   public disconnectedCallback(): void {
@@ -385,7 +394,11 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
       dwdLimiter,
     });
     this._player.toolbar = this._toolbar;
-    this._player.start(cfg.frame_count ?? 5);
+    // frame count is derived from past_minutes / forecast_minutes / stride
+    // via getEffectiveTimeRange — passed in for back-compat with the
+    // start(frameCount) signature. Player re-derives from this._cfg
+    // internally too.
+    this._player.start(getEffectiveTimeRange(cfg).frameCount);
 
     if (cfg.show_wildfires === true) {
       this._wildfireLayer = new WildfireLayer(this._map, () => this._config, this.hass);
@@ -818,7 +831,7 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     this._map.on('moveend zoomend', () => {
       if (this._navReloadTimer) clearTimeout(this._navReloadTimer);
       this._navReloadTimer = setTimeout(() => {
-        this._player?.onNavSettled(this._config.frame_count ?? 5);
+        this._player?.onNavSettled(getEffectiveTimeRange(this._config).frameCount);
       }, 100);
       // When the user is editing this card, push the new map view straight
       // into the editor's Lat/Long/Zoom fields. WYSIWYG — no save button.
