@@ -416,14 +416,21 @@ export class NwsAlertsLayer {
         // autoPan defaults to true — when an off-edge popup opens, Leaflet
         // pans the map so it's fully visible inside the card. autoPanPadding
         // adds a small inset so the popup never butts right against the card
-        // edge (looks awkward).
+        // edge (looks awkward). maxHeight caps the popup at 90% of the map
+        // height so a long alert description never spills outside the card;
+        // Leaflet adds an internal scrollbar past the cap.
         layer.bindPopup(
           buildPopupHtml(feature.properties as AlertProps | null),
-          { autoPan: true, autoPanPadding: [12, 12] },
+          { autoPan: true, autoPanPadding: [12, 12], maxHeight: this._popupMaxHeight() },
         );
       },
     });
     this._polygonLayer.addTo(this._map);
+  }
+
+  /** 80% of the current map height, floored at 200 px so a tiny / not-yet-sized map still produces a usable popup. */
+  private _popupMaxHeight(): number {
+    return Math.max(200, Math.floor(this._map.getSize().y * 0.8));
   }
 
   private _scheduleNext(): void {

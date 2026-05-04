@@ -309,7 +309,7 @@ export class WildfireLayer {
               this._inciwebSlugs,
               this._inciwebReady,
             ),
-            { autoPan: true, autoPanPadding: [12, 12] },
+            { autoPan: true, autoPanPadding: [12, 12], maxHeight: this._popupMaxHeight() },
           );
         },
       });
@@ -331,12 +331,17 @@ export class WildfireLayer {
         const marker = L.marker(item.latLng, { icon });
         marker.bindPopup(
           buildPopupHtml(props, this._inciwebSlugs, this._inciwebReady),
-          { autoPan: true, autoPanPadding: [12, 12] },
+          { autoPan: true, autoPanPadding: [12, 12], maxHeight: this._popupMaxHeight() },
         );
         marker.addTo(this._iconLayer!);
       }
       this._iconLayer.addTo(this._map);
     }
+  }
+
+  /** 80% of the current map height, floored at 200 px so a tiny / not-yet-sized map still produces a usable popup. */
+  private _popupMaxHeight(): number {
+    return Math.max(200, Math.floor(this._map.getSize().y * 0.8));
   }
 
   private _scheduleNext(): void {
