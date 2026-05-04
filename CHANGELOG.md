@@ -7,68 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [3.5.0-beta1] - 2026-05-04
 
-- **Loading spinner** — a small rotating indicator now sits in the centre of the bottom bar (between the timestamp and attribution) while radar tiles are being fetched. Visible during the initial load, after pan/zoom reload, and the periodic 5-minute refresh; hidden when only cached frames are cycling. Honours `prefers-reduced-motion` (the dot stays visible but does not spin). Contributed by [@genericJE](https://github.com/genericJE) (#124).
-- **`show_loading_spinner` config option** — toggles the loading spinner described above. Defaults to `true`; set to `false` to suppress it on cards where the brief load is imperceptible and the indicator would only add noise.
-- **"Now" marker on the progress bar** — the segment whose timestamp is closest to wall clock now gets a small amber stripe at the top, a `title="Now"` tooltip, and the displayed timestamp gains a `(now)` suffix when playback reaches that frame. Mostly useful with DWD forecast frames where "now" sits in the middle of the timeline rather than at the end. The stripe colour follows HA's `--warning-color` theme variable (falling back to `#ff9800`), so custom themes pick it up automatically. Contributed by [@genericJE](https://github.com/genericJE) (#125).
-
-### Fixed
-
-- **Dark / satellite map scale rendered a faint duplicate label** behind the main "50 km" text. Leaflet's default `.leaflet-control-scale-line` carries a `text-shadow: 1px 1px #fff` for readability on light basemaps; on the dark / satellite styles that shadow rendered as a ghost. The `.map-dark` override now sets `text-shadow: none`. Contributed by [@genericJE](https://github.com/genericJE) (#123).
-
-## [3.5.0-alpha2] - 2026-05-03
-
-> Animation polish on top of `3.5.0-alpha`.
+> First beta cut of the 3.5 line. Two big new US-only overlays (wildfires, NWS watches & warnings), a source-agnostic time-range editor that retires `frame_count`, animation polish, and three quality-of-life contributions from [@genericJE](https://github.com/genericJE). Consolidates the `3.5.0-alpha` and `3.5.0-alpha2` prereleases.
+>
+> **US-only data** in the new overlays — see the strong life-safety disclaimers in the README.
 
 ### Added
 
-- **`smooth_overlap` config knob (0–1)** — tunable crossfade overlap when `smooth_animation: true`. `0` = sequential (no brightness dip; cushion held), `0.5` = 50% overlap, `1` = fully simultaneous (default; brief mid-transition dip). Fade duration auto-calibrates so the full cycle still equals `frame_delay` regardless of overlap. Exposed in the editor as a 0–1 slider.
-- **Editor mutual gating for animation timing** — `transition_time` is disabled when Smooth Animation is on (the smooth path computes its own fade); `smooth_overlap` is disabled when Smooth Animation is off. Both fields stay visible so the relationship is obvious.
+#### Hazard overlays (US-only)
 
-### Fixed
-
-- **Trail on first cycle after editing animation settings.** Changing animation settings used to leave stale CSS-transition state on the radar layers, producing a visible trail on the first cycle after the change. setConfig now does a full teardown + reinit on any structural config change. Exception: when the user pans/zooms the live map in editor mode, the back-propagated `center_latitude` / `center_longitude` / `zoom_level` keys are diffed and skipped — a teardown there would interrupt the user's active interaction. Direct YAML edits to those keys still move the map (via `setView`), guarded against re-firing as a back-prop bounce.
-
-### Localization
-
-11 language files updated for the new `smooth_overlap` editor strings.
-
-## [3.5.0-alpha] - 2026-05-03
-
-> First alpha cut from the `nws-alerts` branch. Layered on top of
-> `3.4.0-beta` (DWD radar + crossfade fix). **US-only data** in the new
-> overlays — see the strong life-safety disclaimers in the README.
-
-### Added
-
-- **Wildfire perimeter overlay** (US-only) — `show_wildfires: true` overlays active US wildfire perimeters from NIFC's [WFIGS Current Interagency Fire Perimeters](https://data-nifc.opendata.arcgis.com/datasets/nifc::wfigs-current-interagency-fire-perimeters/about) feed. Active fires draw red, fully-contained ones grey. Small incidents render as a fire icon at the centroid; larger ones as a polygon outline. Click any fire for a popup with name, acreage, containment %, discovery date, and a link to NIFC's InciWeb (gated against InciWeb's RSS index so we don't link to 404s). Adaptive 5/30-minute refresh. Filter knobs: `wildfire_min_acres` (default 10), `wildfire_radius_km`, plus colour / fill / refresh overrides.
-- **NWS watches & warnings overlay** (US-only) — `show_alerts: true` overlays active US National Weather Service watches and warnings from `api.weather.gov/alerts/active`. Alerts render as translucent polygons coloured per [NWS's standard warning palette](https://www.weather.gov/help-map). Both polygon-bearing and zone-based alerts render: zone shapes are fetched on-demand from `api.weather.gov/zones/...` and cached in localStorage (TTL 30 days, versioned key prefix `wrc-zone-v1:`) so they're zero-network on subsequent sessions. Click any alert for a popup with event, headline, severity / certainty / urgency, effective and expiry windows, full description (preserves NWS's line breaks), and a link to weather.gov.
+- **Wildfire perimeter overlay** — `show_wildfires: true` overlays active US wildfire perimeters from NIFC's [WFIGS Current Interagency Fire Perimeters](https://data-nifc.opendata.arcgis.com/datasets/nifc::wfigs-current-interagency-fire-perimeters/about) feed. Active fires draw red, fully-contained ones grey. Small incidents render as a fire icon at the centroid; larger ones as a polygon outline. Click any fire for a popup with name, acreage, containment %, discovery date, and a link to NIFC's InciWeb (gated against InciWeb's RSS index so we don't link to 404s). Adaptive 5/30-minute refresh. Filter knobs: `wildfire_min_acres` (default 10), `wildfire_radius_km`, plus colour / fill / refresh overrides.
+- **NWS watches & warnings overlay** — `show_alerts: true` overlays active US National Weather Service watches and warnings from `api.weather.gov/alerts/active`. Alerts render as translucent polygons coloured per [NWS's standard warning palette](https://www.weather.gov/help-map). Both polygon-bearing and zone-based alerts render: zone shapes are fetched on-demand from `api.weather.gov/zones/...` and cached in localStorage (TTL 30 days, versioned key prefix `wrc-zone-v1:`) so they're zero-network on subsequent sessions. Click any alert for a popup with event, headline, severity / certainty / urgency, effective and expiry windows, full description (preserves NWS's line breaks), and a link to weather.gov.
 - **Hazard Overlays editor subpage** — new top-level "Markers and Overlays" section in the editor groups two nav rows: **Markers** (the existing list) and **Hazard Overlays** (new). The Hazard Overlays subpage exposes the wildfire and alerts toggles, their per-overlay knobs (min_acres, radius_km, min_severity), and a 2-column grid of NWS alert-category checkboxes (Tornado, Thunderstorm, Flood, Winter, Tropical, Fire Weather, Heat, Wind, Marine, Other; marine off by default).
-- **Build timestamp in console signon** — the card's startup signon now reads `WEATHER-RADAR-CARD Version X.Y.Z (built YYYY-MM-DD HH:MM:SS UTC)` so users can confirm a hard refresh actually loaded the new bundle vs a cached older one. Injected by a tiny inline rollup plugin.
 - **Region-warning utility** — surfaces a banner when any US-only feature (wildfires, alerts, NOAA radar) is enabled with `hass.config.country !== 'US'`. Multiple US-only features collapse into a single combined banner instead of stacking.
+
+#### Time-range editor (replaces `frame_count`)
+
+- **`past_minutes` / `forecast_minutes` config** — source-agnostic time-range fields that work across all radar sources. The editor renders them as preset dropdowns (`20 min, 40 min, 1 h, 2 h, 4 h, 6 h, 12 h, 24 h, 48 h, 72 h, 84 h`) filtered by per-source caps. RainViewer caps at 2 h; NOAA caps at 2 h (the API advertises 4 h but frames > 2 h come back empty in practice); DWD caps the editor at 12 h (the API serves 84 h via YAML).
+- **Forecast Duration field** appears only on sources with a forecast (currently DWD: `Off / 1 h / 2 h`). Hidden in the DOM for RainViewer / NOAA.
+- **`frame_stride_minutes`** — YAML-only escape hatch for users who want very large past windows on DWD without the implied frame count.
+- **`SOURCE_CAPS` table** in `src/source-caps.ts` is the single source of truth for per-source `intervalMin` / `maxPastMin` / `editorMaxPastMin` / `maxForecastMin` / defaults. Adding a new radar source = adding a row.
+- **Auto-migration** — `migrateConfig` silently converts legacy `frame_count` to `past_minutes` (using the source's native interval) and `dwd_forecast_hours` to `forecast_minutes`. Existing configs need no changes; warning logged once. The DWD-only `dwd_past_hours` field proposed in [#121](https://github.com/Makin-Things/weather-radar-card/pull/121) by [@genericJE](https://github.com/genericJE) prompted this broader source-agnostic redesign.
+
+#### Animation
+
+- **`smooth_overlap` config knob (0–1)** — tunable crossfade overlap when `smooth_animation: true`. `0` = sequential (no brightness dip; cushion held), `0.5` = 50% overlap, `1` = fully simultaneous (default; brief mid-transition dip). Fade duration auto-calibrates so the full cycle still equals `frame_delay` regardless of overlap. Exposed in the editor as a 0–1 slider with mutual gating against `transition_time`.
+
+#### Other
+
+- **Loading spinner** — a small rotating indicator sits in the centre of the bottom bar while radar tiles are being fetched (initial load, post-pan/zoom reload, periodic 5-minute refresh); hidden when only cached frames are cycling. Honours `prefers-reduced-motion`. `show_loading_spinner: false` suppresses. Contributed by [@genericJE](https://github.com/genericJE) (#124).
+- **"Now" marker on the progress bar** — the segment whose timestamp is closest to wall clock now gets a small amber stripe at the top, a `title="Now"` tooltip, and the displayed timestamp gains a `(now)` suffix while playback shows that frame. Mostly useful with DWD forecast frames where "now" sits in the middle of the timeline. The stripe colour follows HA's `--warning-color` theme variable. Contributed by [@genericJE](https://github.com/genericJE) (#125).
+- **Build timestamp in console signon** — the card's startup signon now reads `WEATHER-RADAR-CARD Version X.Y.Z (built YYYY-MM-DD HH:MM:SS UTC)` so users can confirm a hard refresh actually loaded the new bundle vs a cached older one.
 
 ### Changed
 
-- **WYSIWYG map editing** — when this card's edit dialog is open, every pan/zoom in the live map auto-propagates to the editor's Lat/Long/Zoom fields in real time. The "Save as map center" button is removed entirely. Detection via window-level events from the editor element's connect/disconnect lifecycle (so the auto-propagate is OFF when only the dashboard is in edit mode but no card editor is open — fixes a pre-existing bug where the save button was visible in that state).
+- **WYSIWYG map editing** — when this card's edit dialog is open, every pan/zoom in the live map auto-propagates to the editor's Lat/Long/Zoom fields in real time. The "Save as map center" button is removed entirely. Detection via window-level events from the editor element's connect/disconnect lifecycle, with a global mount counter to handle the dialog mount-order race.
 - **Toggle layout standardised** — every `<label>` switch now renders as `[switch] [text]` left-aligned with a gap. Single source of truth.
-- **Per-source rate limiters are now module-level singletons** — survive card teardown (config edits no longer reset the count) and shared across multiple weather-radar-cards on the same dashboard.
+- **Per-source rate limiters are now module-level singletons** — survive card teardown (config edits no longer reset the count) and are shared across multiple weather-radar-cards on the same dashboard.
 - **Pause when hidden** — wildfire and NWS-alerts layers stop their refresh timers when the card scrolls off-screen or the tab is hidden, and refetch on resume if the pause was longer than the visible-refresh interval. Radar player already paused itself.
-- **Dynamic radar tile size** — picks 256/512/1024/2048 from `map.getSize()` so panel-view / fullscreen maps load with bigger tiles (fewer requests for the same coverage). All three radar sources support this. **Confirmed empirically to noticeably cut load time and rate-limit hits on larger maps.**
+- **Dynamic radar tile size** — picks 256 / 512 / 1024 / 2048 from `map.getSize()` so panel-view / fullscreen maps load with bigger tiles (fewer requests for the same coverage). All three radar sources support this. **Empirically cuts load time and rate-limit hits on larger maps.**
+- **`npm run build` regenerates `.js.gz`** alongside the `.js` so HA can't serve a stale gzipped bundle from a previous build.
 
 ### Fixed
 
-- **Bug — alerts_categories: [] now correctly hides everything.** Previously an explicit empty array fell back to the default category set, so unchecking every category in the editor reverted to "show everything". New `getActiveAlertCategories(configured)` helper distinguishes `undefined` (use defaults) from `[]` (none).
-- **Bug — popup `[wildfire]` race during zone resolution.** `_zoneFetches` could be left with stale entries on localStorage cache hits because the function returned synchronously before the caller registered it. Refactored so `_fetchZone` self-registers as its first action, eliminating the order-of-operations bug.
+- **Trail on first cycle after editing animation settings.** Changing animation settings used to leave stale CSS-transition state on the radar layers, producing a visible trail on the first cycle after the change. `setConfig` now does a full teardown + reinit on any structural config change. Exception: back-propagated `center_latitude` / `center_longitude` / `zoom_level` are diffed and skipped — a teardown there would interrupt the user's active interaction. Direct YAML edits still move the map via `setView`, guarded against re-firing as a back-prop bounce.
+- **Editor-open detection race** — a fresh card opened in HA's edit dialog used to silently miss the back-propagation of map pan/zoom into the editor's Lat/Long fields, because the dialog can mount the editor before the preview card. Card now consults a global mount counter on connect to recover from the missed event.
+- **`alerts_categories: []` now correctly hides everything.** Previously an explicit empty array fell back to the default category set, so unchecking every category in the editor reverted to "show everything". New `getActiveAlertCategories(configured)` helper distinguishes `undefined` (use defaults) from `[]` (none).
+- **Popup `[wildfire]` race during zone resolution.** `_zoneFetches` could be left with stale entries on localStorage cache hits because the function returned synchronously before the caller registered it. Refactored so `_fetchZone` self-registers as its first action.
 - **Popup accent colour uses WCAG-style relative luminance** — replaces a hardcoded list of "light" hex values, so any future palette additions get the right text colour automatically.
+- **Dark / satellite map scale rendered a faint duplicate label** behind the main "50 km" text. Leaflet's default `.leaflet-control-scale-line` carries a `text-shadow: 1px 1px #fff` for readability on light basemaps; on the dark / satellite styles that shadow rendered as a ghost. The `.map-dark` override now sets `text-shadow: none`. Contributed by [@genericJE](https://github.com/genericJE) (#123).
+
+### Documentation
+
+- New `docs/wildfire-feature-design.md` and `docs/nws-alerts-feature-design.md` design docs; planning notes moved to `docs/`.
+- README config table includes `past_minutes`, `forecast_minutes`, `show_loading_spinner`, `show_wildfires`, `show_alerts` and the per-overlay knobs.
 
 ### Localization
 
-11 language files updated for the new editor strings (Hazard Overlays subpage, alert categories, severity levels, region warnings, popup labels). Coverage 92–99% per language; brand acronyms (NWS, NOAA, NIFC, README) and the "Acres" US unit intentionally retained in source form.
+11 language files updated for all new editor strings (time range, hazard overlays, alert categories, severity levels, region warnings, popup labels, loading spinner, now marker). Coverage 92–99% per language; brand acronyms (NWS, NOAA, NIFC, README) and the "Acres" US unit intentionally retained in source form.
 
 ### Tests
 
-128 → 223 unit tests (95 added). New coverage: geo helpers (centroid, haversine, bbox), string helpers (escapeHtml XSS injection patterns, slugify, truncate), NWS alert categories (regression guard for the empty-array bug), NWS alert colour table, region-warning composition, alert-layer helpers (featureKey, decisionsEqual including zone-arrival diff, severity-sort, luminance, formatDateTime, localStorage zone cache round-trip + TTL eviction + corrupt JSON + quota-exceeded handling). Pure-helper extraction (`src/geo-utils.ts`, `src/string-utils.ts`) deduplicates code that was previously identical between the wildfire and alerts layers.
+128 → 250 unit tests (122 added). New coverage: geo helpers (centroid, haversine, bbox), string helpers (escapeHtml XSS injection patterns, slugify, truncate), NWS alert categories, NWS alert colour table, region-warning composition, alert-layer helpers (featureKey, decisionsEqual including zone-arrival diff, severity-sort, luminance, formatDateTime, localStorage zone cache round-trip + TTL eviction + corrupt JSON + quota-exceeded handling), `getEffectiveTimeRange` (defaults, clamps, stride snapping, edge cases), `migrateConfig` time-range migration, `nearestFrameIndex` for the now marker. Pure-helper extraction (`src/geo-utils.ts`, `src/string-utils.ts`, `src/source-caps.ts`) deduplicates code that was previously identical between layers.
 
 ## [3.4.0] - 2026-05-04
 
