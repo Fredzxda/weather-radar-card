@@ -120,7 +120,8 @@
         "moderate": "Mäßig",
         "minor": "Gering",
         "unknown": "Unbekannt"
-      }
+      },
+      "square_map_disabled_helper": "Deaktiviert, wenn eine Höhe festgelegt ist oder die Karte in einer Sections-Zelle mit fester Zeilenanzahl liegt — diese Beschränkungen legen die Kartenhöhe bereits fest."
     },
     "interaction": {
       "disable_scroll": "Scrollen deaktivieren (Seitenwischen über die Karte erlauben)",

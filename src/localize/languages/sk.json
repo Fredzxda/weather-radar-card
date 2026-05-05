@@ -119,7 +119,8 @@
         "moderate": "Mierna",
         "minor": "Malá",
         "unknown": "Neznáma"
-      }
+      },
+      "square_map_disabled_helper": "Deaktivované, keď je nastavená výška alebo je karta v bunke sekčnej mriežky s pevným počtom riadkov — tieto obmedzenia už fixujú výšku karty."
     },
     "interaction": {
       "disable_scroll": "Zakázať posúvanie (umožniť potiahnutie stránky cez mapu)",

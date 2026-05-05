@@ -118,4 +118,17 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
   show_error?: boolean;
   test_gui?: boolean;
   show_header_toggle?: boolean;
+  /**
+   * HA's sections-view grid passes grid_options on the card config to
+   * record the user's resize-handle position. We don't write it; we
+   * read it (along with `height`) to know when the card's vertical
+   * extent is being externally constrained — the editor uses that to
+   * grey out controls (like square_map) that have no effect under that
+   * constraint. `rows: 'auto'` means HA lets the card pick its height,
+   * which is back to the unconstrained case.
+   */
+  grid_options?: {
+    rows?: number | 'auto';
+    columns?: number | 'full';
+  };
 }

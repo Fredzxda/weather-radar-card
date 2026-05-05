@@ -119,7 +119,8 @@
         "moderate": "Moderata",
         "minor": "Lieve",
         "unknown": "Sconosciuta"
-      }
+      },
+      "square_map_disabled_helper": "Disattivato quando è impostata un'altezza o la scheda è in una cella di griglia delle sezioni con numero di righe fisso — questi vincoli fissano già l'altezza della scheda."
     },
     "interaction": {
       "disable_scroll": "Disabilita scorrimento (consente scorrimento della pagina sulla mappa)",

@@ -119,7 +119,8 @@
         "moderate": "Moderat",
         "minor": "Liten",
         "unknown": "Ukjent"
-      }
+      },
+      "square_map_disabled_helper": "Deaktivert når en høyde er angitt eller kortet er i en sections-rutenettcelle med fast radantall — disse begrensningene fastsetter allerede kortets høyde."
     },
     "interaction": {
       "disable_scroll": "Deaktiver rulling (la siden sveipes gjennom kartet)",

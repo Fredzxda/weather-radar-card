@@ -119,7 +119,8 @@
         "moderate": "Umiarkowana",
         "minor": "Mała",
         "unknown": "Nieznana"
-      }
+      },
+      "square_map_disabled_helper": "Wyłączone, gdy ustawiono wysokość lub karta znajduje się w komórce siatki sekcji o stałej liczbie wierszy — te ograniczenia już ustalają wysokość karty."
     },
     "interaction": {
       "disable_scroll": "Wyłącz przewijanie (umożliw przesuwanie strony przez mapę)",

@@ -287,10 +287,30 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
             <ha-switch .checked=${config.static_map === true} .configValue=${'static_map'} @change=${this._valueChangedSwitch}></ha-switch>
             <span>${localize('editor.display.static_map')}</span>
           </label>
-          <label>
-            <ha-switch .checked=${config.square_map === true} .configValue=${'square_map'} @change=${this._valueChangedSwitch}></ha-switch>
-            <span>${localize('editor.display.square_map')}</span>
-          </label>
+          ${(() => {
+            // square_map has no effect once the card's height is being
+            // externally pinned: an explicit `height:` config wins, and
+            // a sections-grid cell with a fixed row count constrains
+            // the card to that cell. Grey out the toggle in those cases
+            // so the user isn't left wondering why nothing happened.
+            // grid_options.rows: 'auto' means HA gave the card freedom
+            // to pick — that counts as un-pinned.
+            const heightPinned = !!config.height
+              || (config.grid_options?.rows !== undefined
+                  && config.grid_options.rows !== 'auto');
+            return html`
+              <label class=${heightPinned ? 'disabled-row' : ''}
+                     title=${heightPinned ? localize('editor.display.square_map_disabled_helper') : ''}>
+                <ha-switch
+                  .checked=${config.square_map === true}
+                  .disabled=${heightPinned}
+                  .configValue=${'square_map'}
+                  @change=${this._valueChangedSwitch}
+                ></ha-switch>
+                <span>${localize('editor.display.square_map')}</span>
+              </label>
+            `;
+          })()}
           <label>
             <ha-switch .checked=${config.cluster_markers !== false} .configValue=${'cluster_markers'} @change=${this._valueChangedSwitch}></ha-switch>
             <span>${localize('editor.display.cluster_markers')}</span>
@@ -1134,6 +1154,14 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
       gap: 10px;
       padding: 6px 0;
       font-size: 0.95em;
+    }
+    /* Greyed-out look for switches whose effect is overridden by another
+       config field (e.g. square_map when height is pinned by the user
+       or by a sections-grid cell). The switch itself is .disabled via
+       the property; this just dims the label text alongside it. */
+    label.disabled-row {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
     ha-switch {
       padding: 12px 6px;

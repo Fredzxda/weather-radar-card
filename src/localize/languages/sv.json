@@ -119,7 +119,8 @@
         "moderate": "Måttlig",
         "minor": "Liten",
         "unknown": "Okänd"
-      }
+      },
+      "square_map_disabled_helper": "Inaktiverad när en höjd är angiven eller kortet ligger i en sections-rutnätscell med ett fast antal rader — dessa begränsningar fixerar redan kortets höjd."
     },
     "interaction": {
       "disable_scroll": "Inaktivera rullning (tillåt sidsvep genom kartan)",

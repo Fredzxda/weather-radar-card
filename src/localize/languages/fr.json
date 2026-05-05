@@ -119,7 +119,8 @@
         "moderate": "Modérée",
         "minor": "Mineure",
         "unknown": "Inconnue"
-      }
+      },
+      "square_map_disabled_helper": "Désactivé lorsqu'une hauteur est définie ou que la carte est dans une cellule de grille de sections avec un nombre de lignes fixe — ces contraintes fixent déjà la hauteur de la carte."
     },
     "interaction": {
       "disable_scroll": "Désactiver le défilement (permet le balayage de la page sur la carte)",

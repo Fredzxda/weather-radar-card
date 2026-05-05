@@ -119,7 +119,8 @@
         "moderate": "Matig",
         "minor": "Gering",
         "unknown": "Onbekend"
-      }
+      },
+      "square_map_disabled_helper": "Uitgeschakeld wanneer een hoogte is ingesteld of de kaart in een sections-rastercel met een vast aantal rijen staat — die beperkingen leggen de kaarthoogte al vast."
     },
     "interaction": {
       "disable_scroll": "Scrollen uitschakelen (laat pagina door kaart vegen)",

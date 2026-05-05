@@ -119,7 +119,8 @@
         "moderate": "Moderada",
         "minor": "Leve",
         "unknown": "Desconocida"
-      }
+      },
+      "square_map_disabled_helper": "Desactivado cuando se establece una altura o la tarjeta está en una celda de cuadrícula de secciones con un número fijo de filas — esas restricciones ya fijan la altura de la tarjeta."
     },
     "interaction": {
       "disable_scroll": "Desactivar desplazamiento (permite deslizar la página sobre el mapa)",
