@@ -11,11 +11,13 @@ import { escapeHtml, slugify } from './string-utils';
 // outFields trimmed to just what the popup renders. geometryPrecision=4 keeps
 // coordinates to ~11m precision and shrinks the payload substantially without
 // any visible difference at our zoom range.
-// Anchor link to the README's Wildfires section on GitHub. Rendered
-// after the popup's safety disclaimer so users can reach the full
-// caveat with one click. The hash matches GitHub's auto-generated
-// anchor for the "### Wildfires" heading.
-const README_WILDFIRES_URL = 'https://github.com/Makin-Things/weather-radar-card#wildfires';
+// Anchor link to the Wildfires section of docs/overlays.md on GitHub.
+// Rendered after the popup's safety disclaimer so users can reach the
+// full caveat with one click. The hash matches GitHub's auto-generated
+// anchor for the "## Wildfires" heading. Branch-pinned to nws-alerts
+// while the docs are still on a feature branch — flip to master at
+// release per docs/todo.md.
+const DOCS_WILDFIRES_URL = 'https://github.com/Makin-Things/weather-radar-card/blob/nws-alerts/docs/overlays.md#wildfires';
 
 const NIFC_URL =
   'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/'
@@ -431,7 +433,7 @@ function buildPopupHtml(
       <div><b>${escapeHtml(localize('ui.wildfire.acres'))}:</b> ${escapeHtml(acresStr)}</div>
       <div><b>${escapeHtml(localize('ui.wildfire.contained'))}:</b> ${escapeHtml(containedStr)}</div>
       <div><b>${escapeHtml(localize('ui.wildfire.discovered'))}:</b> ${escapeHtml(discoveredStr)}</div>
-      <div style="margin-top:6px;font-size:10px;color:#666">${escapeHtml(localize('ui.wildfire.disclaimer'))} <a href="${README_WILDFIRES_URL}" target="_blank" rel="noopener noreferrer" style="color:#666;text-decoration:underline">${escapeHtml(localize('ui.wildfire.see_readme'))}</a>.</div>
+      <div style="margin-top:6px;font-size:10px;color:#666">${escapeHtml(localize('ui.wildfire.disclaimer'))} <a href="${DOCS_WILDFIRES_URL}" target="_blank" rel="noopener noreferrer" style="color:#666;text-decoration:underline">${escapeHtml(localize('ui.wildfire.see_readme'))}</a>.</div>
       ${linkHtml}
     </div>
   `;
