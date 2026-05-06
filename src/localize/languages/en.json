@@ -203,7 +203,13 @@
         "wind": "Wind",
         "marine": "Marine",
         "other": "Other"
-      }
+      },
+      "lightning_header": "Lightning (Blitzortung)",
+      "lightning_description": "Live lightning strikes from the Blitzortung integration. Strikes appear as a brief flash, then a coloured + sign that ages through white → yellow → orange → red.",
+      "lightning_integration_required": "Requires the Blitzortung integration — install it in Home Assistant first.",
+      "lightning_max_age_minutes": "Hide strikes older than (minutes)",
+      "lightning_max_age_minutes_helper": "Card-side cap. Default 30. Does not change the Blitzortung integration’s own max-age setting.",
+      "lightning_label": "Lightning"
     }
   }
 }

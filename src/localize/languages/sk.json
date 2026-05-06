@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Načítavanie radarových dlaždic",
     "now": "(teraz)",
-    "now_tooltip": "Teraz"
+    "now_tooltip": "Teraz",
+    "lightning": {
+      "popup_title": "Úder blesku",
+      "source_label": "Zdroj: Blitzortung",
+      "more_info": "Viac info → Blitzortung",
+      "bearing": {
+        "n": "S",
+        "ne": "SV",
+        "e": "V",
+        "se": "JV",
+        "s": "J",
+        "sw": "JZ",
+        "w": "Z",
+        "nw": "SZ"
+      },
+      "relative": {
+        "just_now": "práve teraz",
+        "seconds_ago": "pred {n} s",
+        "minutes_ago": "pred {n} min",
+        "hours_ago": "pred {n} h"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Neznáma"
       },
       "square_map_disabled_helper": "Deaktivované, keď je nastavená výška alebo je karta v bunke sekčnej mriežky s pevným počtom riadkov — tieto obmedzenia už fixujú výšku karty.",
-      "show_loading_spinner": "Zobraziť indikátor načítavania"
+      "show_loading_spinner": "Zobraziť indikátor načítavania",
+      "show_lightning": "Zobraziť blesky (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Zakázať posúvanie (umožniť potiahnutie stránky cez mapu)",
@@ -181,7 +203,13 @@
         "wind": "Vietor",
         "marine": "Morské",
         "other": "Iné"
-      }
+      },
+      "lightning_header": "Blesky (Blitzortung)",
+      "lightning_description": "Bleskové výboje v reálnom čase z integrácie Blitzortung. Údery sa zobrazujú ako krátky záblesk, potom ako farebný znak +, ktorý starne z bielej cez žltú, oranžovú až po červenú.",
+      "lightning_integration_required": "Vyžaduje integráciu Blitzortung — najprv ju nainštalujte v Home Assistante.",
+      "lightning_max_age_minutes": "Skryť údery staršie ako (minúty)",
+      "lightning_max_age_minutes_helper": "Obmedzenie na strane karty. Predvolené 30. Nemení nastavenie maximálneho veku integrácie Blitzortung.",
+      "lightning_label": "Blesky"
     }
   }
 }

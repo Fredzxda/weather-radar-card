@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0-alpha] - 2026-05-05
+
+> First alpha cut of the 3.6 line. Single new feature: a lightning overlay sourced from the Blitzortung HA integration. No external HTTP from the card — the integration handles all the data plumbing; we just render.
+
+### Added
+
+- **Lightning overlay** (`show_lightning: true`) — live lightning strikes from the [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/), rendered from the integration's `geo_location.lightning_strike_*` entities. Each strike appears as a brief lightning-bolt flash with a one-shot pulse animation (the "happening now!" indicator), and after 30 s settles into a coloured **+** sign. The + sign's fill colour ages through Blitzortung's web-map gradient (white → yellow → orange → coral → red → dark red), mirroring the visual language of [their map](https://map.blitzortung.org/). Newer strikes always paint on top of older ones. Click any strike for a popup with distance / cardinal-bearing from the map centre, relative time, and a deep link into the Blitzortung web map at the strike location.
+- **Two-pane outline-vs-fill rendering** for the + sign — outline marker on a pane at z 499, coloured-fill marker on z 500. At low zoom many overlapping strikes don't dissolve into a "black blob" — outlines stack harmlessly underneath, the topmost colour fill stays clean on top. Bolts stay single-marker (they're bigger and only last 30 s, no stacking issue).
+- **`lightning_max_age_minutes` config** (default 30) — card-side cap that hides strikes older than N minutes. Distinct from the Blitzortung integration's own max-age setting (the integration's setting is the upper bound; the card's cap is whichever is smaller). Editor field with a helper line making the boundary clear.
+- **`lightning_pulse` config** (default `true`) — disable the appearance flash. Honours `prefers-reduced-motion` automatically.
+- **`lightning_icon_size` config** (YAML-only, default 14 px) — pixel size for the + sign; the bolt renders at 1.3× this size.
+- **Hazard Overlays editor row** — Show Lightning toggle disabled + dimmed when the Blitzortung integration isn't loaded, with a tooltip explaining how to enable it. Same `disabled-row` UX pattern as `square_map` when the height is pinned.
+- **Detection helper `isBlitzortungLoaded(hass)`** — checks `hass.config.components` for `'blitzortung'`. Editor and layer both gate on this so a quiet day (no current strikes) doesn't make the toggle disappear.
+- **6-stop colour gradient** in `colorForAge()` — driven by a `COLOR_STOPS` table, single `lerpHex` per call regardless of where t lands. Adding a stop is a one-line edit.
+- **CSS drop-shadow halo** on every strike marker — gives a 2 px black outline against any basemap or radar overlay colour. Cheaper than nesting concentric SVG shapes.
+- **Custom Leaflet panes** `wrc-lightning` (z 500) and `wrc-lightning-outline` (z 499) — between the default `overlayPane` (400) and `markerPane` (600), so lightning sits over radar / wildfire / NWS-alert polygons but the home / person markers stay on top of any strike at the same point.
+
+### Localization
+
+11 language files updated for the new editor strings (Lightning section header / description / integration-required tooltip / max-age field + helper / overlay summary label / Show Lightning toggle) and the popup strings (lightning_strike title, source label, "more info" link, eight cardinal bearings, four relative-time keys). Coverage parity verified at 100% across all 11 languages.
+
+### Tests
+
+314 unit tests (43 new for lightning helpers — `isBlitzortungLoaded` edge cases, `colorForAge` 6-stop endpoints + monotonicity + clamps + zero-maxAge defence, `bearingCardinal` 8-way + same-point + antimeridian, `relativeTime` bucket boundaries + fractional flooring + negative-input clamp, `formatBlitzortungUrl` precision + zoom clamping, plus pins on `BOLT_DURATION_SEC` and `DEFAULT_BLITZORTUNG_MAX_AGE_SEC`).
+
+### Documentation
+
+- New [docs/lightning-feature-design.md](docs/lightning-feature-design.md) marked shipped-in-3.6.0-alpha, with deviations-from-design notes covering the visual-treatment iteration that landed during smoke testing.
+- [docs/overlays.md](docs/overlays.md) gains a Lightning section with the knobs table and a NOTE explaining the card-side cap vs the integration's setting.
+- [docs/configuration.md](docs/configuration.md) options table gains the four lightning fields.
+- [docs/todo.md](docs/todo.md) moves the lightning entry from Open to Shipped.
+
 ## [3.5.0] - 2026-05-05
 
 > Stable cut of the 3.5 line. Two big new US-only overlays (wildfires, NWS watches & warnings), a source-agnostic time-range editor that retires `frame_count`, a DWD-outside-coverage banner, animation polish, three quality-of-life contributions from [@genericJE](https://github.com/genericJE), and a full docs sweep. Consolidates the `3.5.0-alpha`, `3.5.0-alpha2`, and `3.5.0-beta1` prereleases.
@@ -326,7 +358,8 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
-[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha...HEAD
+[3.6.0-alpha]: https://github.com/Makin-Things/weather-radar-card/compare/v3.5.0...v3.6.0-alpha
 [3.5.0]: https://github.com/Makin-Things/weather-radar-card/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/Makin-Things/weather-radar-card/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/Makin-Things/weather-radar-card/compare/v3.2.0-beta...v3.3.0

@@ -29,6 +29,11 @@ const DEFAULT_ICON_SIZE_PX = 14;
 // it sits among. Applied at icon creation; if the user sets
 // lightning_icon_size, the bolt stays proportionally larger.
 const BOLT_SIZE_RATIO = 1.3;
+// Default card-side max-age cap. The Blitzortung integration commonly
+// keeps strikes for 120 min; rendering them all turns busy storms into
+// noise. 30 min surfaces just the meaningful lifetime of an active
+// cell. Configurable via cfg.lightning_max_age_minutes.
+const DEFAULT_MAX_AGE_MIN = 30;
 // 30 s recompute of the age-derived fill — the design doc's chosen
 // cadence. Smoothing the age across 30 s on a multi-thousand-second
 // gradient is visually indistinguishable from continuous fade and
@@ -196,10 +201,14 @@ export class LightningLayer {
   // Walk hass.states once. Only entity_ids matching geo_location.* with
   // attributes.source === 'blitzortung' are strikes — the same entity
   // domain is used for earthquakes, fire perimeters, etc. so the source
-  // attribute is the disambiguator.
+  // attribute is the disambiguator. Strikes already past the
+  // display-cap are filtered out at this stage so a freshly-mounted
+  // card doesn't paint markers it would immediately drop.
   private _collectStrikes(): Map<string, Strike> {
     const out = new Map<string, Strike>();
     if (!this._hass?.states) return out;
+    const maxAgeSec = this._displayMaxAgeSec();
+    const now = Date.now();
     for (const [id, st] of Object.entries(this._hass.states)) {
       if (!id.startsWith('geo_location.')) continue;
       const attrs = (st as any)?.attributes;
@@ -208,11 +217,13 @@ export class LightningLayer {
       const lon = attrs.longitude;
       if (typeof lat !== 'number' || typeof lon !== 'number') continue;
       const ts = parseStrikeTimestamp(st);
+      const ageSec = (now - ts) / 1000;
+      if (ageSec > maxAgeSec) continue;
       // Initial-form decision happens here so a strike we discover well
       // past its 30 s window (e.g. card just mounted with strikes
       // already present) renders as a plus rather than briefly flashing
       // as a bolt.
-      const isBolt = (Date.now() - ts) / 1000 < BOLT_DURATION_SEC;
+      const isBolt = ageSec < BOLT_DURATION_SEC;
       out.set(id, { ts, lat, lon, isBolt });
     }
     return out;
@@ -262,7 +273,7 @@ export class LightningLayer {
 
     // Plus phase: split into FILL + OUTLINE markers on different panes
     // so stacked outlines don't obscure stacked colour fills.
-    const fillColor = colorForAge(this._ageSec(strike), this._maxAgeSec());
+    const fillColor = colorForAge(this._ageSec(strike), this._displayMaxAgeSec());
     this._addPlusMarkers(id, strike, plusSize, fillColor);
   }
 
@@ -377,21 +388,31 @@ export class LightningLayer {
     }
   }
 
-  // Re-paint each + sign's fill, and swap bolt → plus once a strike
-  // crosses BOLT_DURATION_SEC. The swap mutates the existing fill
-  // marker in place (setIcon swaps the icon HTML but keeps the marker
-  // and its popup binding) AND attaches the OUTLINE marker on the
-  // lower pane. The colour-only refresh just mutates the fill marker's
-  // <path> fill attribute. Bolt-phase markers are skipped — their
-  // colour (white fill / red stroke) doesn't depend on age.
+  // Re-paint each + sign's fill, swap bolt → plus once a strike
+  // crosses BOLT_DURATION_SEC, and remove strikes that have aged past
+  // the display cap. The swap mutates the existing fill marker in
+  // place (setIcon swaps the icon HTML but keeps the marker and its
+  // popup binding) AND attaches the OUTLINE marker on the lower pane.
+  // The colour-only refresh just mutates the fill marker's <path>
+  // fill attribute. Bolt-phase markers are skipped — their colour
+  // (white fill / red stroke) doesn't depend on age.
   private _refreshAges(): void {
-    const max = this._maxAgeSec();
+    const max = this._displayMaxAgeSec();
     const cfg = this._getConfig();
     const plusSize = cfg.lightning_icon_size ?? DEFAULT_ICON_SIZE_PX;
+    const toRemove: string[] = [];
     for (const [id, strike] of this._strikes) {
       const marker = this._markers.get(id);
       if (!marker) continue;
       const ageSec = this._ageSec(strike);
+
+      // Past the display cap → drop the strike from the card. The
+      // Blitzortung integration may still hold the underlying entity
+      // (its own max-age is the upper bound); we just stop rendering.
+      if (ageSec > max) {
+        toRemove.push(id);
+        continue;
+      }
 
       // Form transition (one-way: bolt → plus). Swap the existing
       // marker's icon to the FILL SVG, then attach a new OUTLINE
@@ -431,6 +452,13 @@ export class LightningLayer {
       if (!pathEl) continue;
       pathEl.setAttribute('fill', colorForAge(ageSec, max));
     }
+    // Drop expired strikes outside the iteration so we don't mutate
+    // the Map we're walking. The strike stays in hass.states (the
+    // integration's max-age governs that); we just stop tracking it.
+    for (const id of toRemove) {
+      this._strikes.delete(id);
+      this._removeMarker(id);
+    }
   }
 
   // Build the popup HTML. Inline-styled because Leaflet's popup container
@@ -468,6 +496,21 @@ export class LightningLayer {
 
   private _ageSec(strike: Strike): number {
     return Math.max(0, (Date.now() - strike.ts) / 1000);
+  }
+
+  // The effective max-age the card uses for both filtering (don't
+  // render past this) and the colour gradient denominator. Returns
+  // min(card cap, integration max). The card cap defaults to 30 min;
+  // overridable via cfg.lightning_max_age_minutes. We never EXCEED
+  // the integration's max-age — there's no point pretending strikes
+  // exist that the integration has already dropped from hass.states.
+  private _displayMaxAgeSec(): number {
+    const cfg = this._getConfig();
+    const cardCapMin = cfg.lightning_max_age_minutes ?? DEFAULT_MAX_AGE_MIN;
+    // Floor at 1 min to keep the gradient meaningful and avoid silly
+    // configs like 0 or negative values blanking the layer entirely.
+    const cardCapSec = Math.max(60, cardCapMin * 60);
+    return Math.min(cardCapSec, this._maxAgeSec());
   }
 
   // Try to pull the user's actual configured Blitzortung max-age out of

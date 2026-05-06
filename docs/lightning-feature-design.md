@@ -2,9 +2,18 @@
 
 Live lightning-strike overlay sourced from the user's existing [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) in Home Assistant. No external HTTP from the card — strikes are already in `hass.states` as `geo_location` entities, and the integration handles all polling, distance filtering, and age-capping. The card just renders.
 
-## Status — proposed for v3.6
+## Status — shipped in v3.6.0-alpha
 
-Tracking issue: TBD on creation. Targeted at the 3.6 milestone (post 3.5.0 stable).
+Implementation: [src/lightning-layer.ts](../src/lightning-layer.ts) + [src/lightning-helpers.ts](../src/lightning-helpers.ts) (pure helpers — `isBlitzortungLoaded`, `colorForAge`, `bearingCardinal`, `relativeTime`, `formatBlitzortungUrl`, `BOLT_DURATION_SEC`, `DEFAULT_BLITZORTUNG_MAX_AGE_SEC`). Card wiring in [src/weather-radar-card.ts](../src/weather-radar-card.ts); editor row in the Hazard Overlays subpage of [src/editor.ts](../src/editor.ts). Tests in [tests/lightning-helpers.test.ts](../tests/lightning-helpers.test.ts).
+
+**Deviations from this design:**
+
+- **Visual treatment swapped through three iterations during smoke-testing** before settling on the current bolt-then-+ shape. The original spec called for a constant `mdi:lightning-bolt-outline` icon ageing through colour. Storm testing revealed two problems: (1) yellow strikes vanished against yellow precipitation cells in the radar layer, and (2) at low zoom many overlapping strikes piled their black outlines into a "black blob" that obscured the colours. Final design: bolt + pulse for the first 30 s (the "happening now!" indicator), then a chunky `mdi:plus-thick` cross. The + is split into two markers on different Leaflet panes — outline on z-499, fill on z-500 — so stacked outlines pile harmlessly underneath while the topmost colour fill stays visible.
+- **Card-side max-age cap** added (`lightning_max_age_minutes`, default 30). The integration's default keeps strikes for 120 min, which on busy days fills the map with stale data; 30 min is a more meaningful "what's happening now" window. The cap is purely a display filter — does NOT change the integration's setting; the effective cap is `min(card_cap, integration_max)`. Editor exposes the field with a helper line making the boundary clear.
+- **Dedicated Leaflet pane** at z-index 500 (with the OUTLINE pane at 499) — sits between Leaflet's overlayPane (400) and markerPane (600). Lightning is visible over radar / wildfire / NWS-alert polygons but the home / person markers stay on top of any strike at the same point.
+- **Pulse animation lives on the inner SVG, not the divIcon container.** Smoke testing exposed that putting the pulse class on the outer container (which Leaflet owns for `transform: translate3d(...)` positioning) made every flashing strike visually snap to the lightning pane's origin (≈ map centre / home marker) for the duration of the keyframe, because the keyframe's `transform: scale(2)` clobbered Leaflet's translate. Moving the class to the inner SVG keeps Leaflet's positioning intact.
+
+The rest of the design — Blitzortung detection via `hass.config.components`, six-stop white→dark red gradient, no card-side `lightning_radius_km` (inherits the integration's filter), 30-second age refresh, popup chrome with distance / bearing / relative time + Blitzortung deep link, no region banner — landed as written.
 
 **Why it fits the card:** lightning is a natural complement to a precipitation radar view, especially in summer / convective seasons where strike density tells you which side of a cell is active. The Blitzortung integration is widely installed (HACS popular plus shipping in HA Core), so adoption barrier is low for users who already track lightning.
 

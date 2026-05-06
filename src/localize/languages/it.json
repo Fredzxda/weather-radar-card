@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Caricamento dei tile radar",
     "now": "(ora)",
-    "now_tooltip": "Ora"
+    "now_tooltip": "Ora",
+    "lightning": {
+      "popup_title": "Fulmine",
+      "source_label": "Fonte: Blitzortung",
+      "more_info": "Altre info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NE",
+        "e": "E",
+        "se": "SE",
+        "s": "S",
+        "sw": "SO",
+        "w": "O",
+        "nw": "NO"
+      },
+      "relative": {
+        "just_now": "proprio ora",
+        "seconds_ago": "{n} s fa",
+        "minutes_ago": "{n} min fa",
+        "hours_ago": "{n} h fa"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Sconosciuta"
       },
       "square_map_disabled_helper": "Disattivato quando è impostata un'altezza o la scheda è in una cella di griglia delle sezioni con numero di righe fisso — questi vincoli fissano già l'altezza della scheda.",
-      "show_loading_spinner": "Mostra indicatore di caricamento"
+      "show_loading_spinner": "Mostra indicatore di caricamento",
+      "show_lightning": "Mostra fulmini (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Disabilita scorrimento (consente scorrimento della pagina sulla mappa)",
@@ -181,7 +203,13 @@
         "wind": "Vento",
         "marine": "Marino",
         "other": "Altro"
-      }
+      },
+      "lightning_header": "Fulmini (Blitzortung)",
+      "lightning_description": "Fulmini in tempo reale dall’integrazione Blitzortung. Gli impatti appaiono come un breve lampo, poi come un segno + colorato che invecchia da bianco → giallo → arancione → rosso.",
+      "lightning_integration_required": "Richiede l’integrazione Blitzortung — installala prima in Home Assistant.",
+      "lightning_max_age_minutes": "Nascondi fulmini più vecchi di (minuti)",
+      "lightning_max_age_minutes_helper": "Limite lato scheda. Predefinito 30. Non modifica l’impostazione di età massima dell’integrazione Blitzortung.",
+      "lightning_label": "Fulmini"
     }
   }
 }

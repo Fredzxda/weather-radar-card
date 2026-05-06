@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Ładowanie kafelków radaru",
     "now": "(teraz)",
-    "now_tooltip": "Teraz"
+    "now_tooltip": "Teraz",
+    "lightning": {
+      "popup_title": "Uderzenie pioruna",
+      "source_label": "Źródło: Blitzortung",
+      "more_info": "Więcej → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NE",
+        "e": "E",
+        "se": "SE",
+        "s": "S",
+        "sw": "SW",
+        "w": "W",
+        "nw": "NW"
+      },
+      "relative": {
+        "just_now": "przed chwilą",
+        "seconds_ago": "{n} s temu",
+        "minutes_ago": "{n} min temu",
+        "hours_ago": "{n} godz. temu"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Nieznana"
       },
       "square_map_disabled_helper": "Wyłączone, gdy ustawiono wysokość lub karta znajduje się w komórce siatki sekcji o stałej liczbie wierszy — te ograniczenia już ustalają wysokość karty.",
-      "show_loading_spinner": "Pokaż wskaźnik ładowania"
+      "show_loading_spinner": "Pokaż wskaźnik ładowania",
+      "show_lightning": "Pokaż pioruny (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Wyłącz przewijanie (umożliw przesuwanie strony przez mapę)",
@@ -181,7 +203,13 @@
         "wind": "Wiatr",
         "marine": "Morskie",
         "other": "Inne"
-      }
+      },
+      "lightning_header": "Pioruny (Blitzortung)",
+      "lightning_description": "Wyładowania atmosferyczne na żywo z integracji Blitzortung. Uderzenia pojawiają się jako krótki błysk, a następnie jako kolorowy znak +, który starzeje się od bieli do żółci, pomarańczu i czerwieni.",
+      "lightning_integration_required": "Wymaga integracji Blitzortung — zainstaluj ją najpierw w Home Assistant.",
+      "lightning_max_age_minutes": "Ukryj uderzenia starsze niż (minuty)",
+      "lightning_max_age_minutes_helper": "Limit po stronie karty. Domyślnie 30. Nie zmienia ustawienia maksymalnego wieku integracji Blitzortung.",
+      "lightning_label": "Pioruny"
     }
   }
 }

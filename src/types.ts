@@ -105,6 +105,13 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
   wildfire_refresh_minutes?: number;
   // Lightning overlay (Blitzortung integration — see docs/lightning-feature-design.md)
   show_lightning?: boolean;
+  /**
+   * Hide strikes older than this many minutes. Card-side cap only — does
+   * NOT change the Blitzortung integration's own max-age setting (the
+   * integration may still track older strikes; we just don't render them).
+   * Effective cap is min(this, integration's max-age). Default 30 min.
+   */
+  lightning_max_age_minutes?: number;
   /** One-shot brightness flash on new-strike appearance. Disabled when the user prefers reduced motion. */
   lightning_pulse?: boolean;
   /** YAML-only escape hatch for the inline-SVG icon dimension. Default 14 px reads on a busy storm without cluttering. */

@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Laster radarfliser",
     "now": "(nå)",
-    "now_tooltip": "Nå"
+    "now_tooltip": "Nå",
+    "lightning": {
+      "popup_title": "Lynnedslag",
+      "source_label": "Kilde: Blitzortung",
+      "more_info": "Mer info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NØ",
+        "e": "Ø",
+        "se": "SØ",
+        "s": "S",
+        "sw": "SV",
+        "w": "V",
+        "nw": "NV"
+      },
+      "relative": {
+        "just_now": "akkurat nå",
+        "seconds_ago": "{n} s siden",
+        "minutes_ago": "{n} min siden",
+        "hours_ago": "{n} t siden"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Ukjent"
       },
       "square_map_disabled_helper": "Deaktivert når en høyde er angitt eller kortet er i en sections-rutenettcelle med fast radantall — disse begrensningene fastsetter allerede kortets høyde.",
-      "show_loading_spinner": "Vis lasteindikator"
+      "show_loading_spinner": "Vis lasteindikator",
+      "show_lightning": "Vis lyn (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Deaktiver rulling (la siden sveipes gjennom kartet)",
@@ -181,7 +203,13 @@
         "wind": "Vind",
         "marine": "Maritimt",
         "other": "Annet"
-      }
+      },
+      "lightning_header": "Lyn (Blitzortung)",
+      "lightning_description": "Lynnedslag i sanntid fra Blitzortung-integrasjonen. Nedslag vises som et kort blink, deretter som et farget +-tegn som eldes fra hvitt til gult, oransje og rødt.",
+      "lightning_integration_required": "Krever Blitzortung-integrasjonen — installer den først i Home Assistant.",
+      "lightning_max_age_minutes": "Skjul nedslag eldre enn (minutter)",
+      "lightning_max_age_minutes_helper": "Kort-side begrensning. Standard 30. Endrer ikke maks-alder-innstillingen til Blitzortung-integrasjonen.",
+      "lightning_label": "Lyn"
     }
   }
 }

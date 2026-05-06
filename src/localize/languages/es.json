@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Cargando mosaicos de radar",
     "now": "(ahora)",
-    "now_tooltip": "Ahora"
+    "now_tooltip": "Ahora",
+    "lightning": {
+      "popup_title": "Impacto de rayo",
+      "source_label": "Fuente: Blitzortung",
+      "more_info": "Más información → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NE",
+        "e": "E",
+        "se": "SE",
+        "s": "S",
+        "sw": "SO",
+        "w": "O",
+        "nw": "NO"
+      },
+      "relative": {
+        "just_now": "ahora mismo",
+        "seconds_ago": "hace {n} s",
+        "minutes_ago": "hace {n} min",
+        "hours_ago": "hace {n} h"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Desconocida"
       },
       "square_map_disabled_helper": "Desactivado cuando se establece una altura o la tarjeta está en una celda de cuadrícula de secciones con un número fijo de filas — esas restricciones ya fijan la altura de la tarjeta.",
-      "show_loading_spinner": "Mostrar indicador de carga"
+      "show_loading_spinner": "Mostrar indicador de carga",
+      "show_lightning": "Mostrar rayos (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Desactivar desplazamiento (permite deslizar la página sobre el mapa)",
@@ -181,7 +203,13 @@
         "wind": "Viento",
         "marine": "Marino",
         "other": "Otros"
-      }
+      },
+      "lightning_header": "Rayos (Blitzortung)",
+      "lightning_description": "Rayos en tiempo real desde la integración Blitzortung. Los impactos aparecen como un destello breve, luego como un signo + coloreado que envejece de blanco → amarillo → naranja → rojo.",
+      "lightning_integration_required": "Requiere la integración Blitzortung — instálela primero en Home Assistant.",
+      "lightning_max_age_minutes": "Ocultar rayos más antiguos que (minutos)",
+      "lightning_max_age_minutes_helper": "Límite del lado de la tarjeta. Predeterminado 30. No cambia la configuración de antigüedad máxima de la integración Blitzortung.",
+      "lightning_label": "Rayos"
     }
   }
 }

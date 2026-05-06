@@ -6,6 +6,7 @@ import { WeatherRadarCardConfig, CoordinateConfig, Marker } from './types';
 import { migrateConfig } from './marker-utils';
 import { localize } from './localize/localize';
 import { ALL_ALERT_CATEGORIES, getActiveAlertCategories } from './nws-alert-categories';
+import { isBlitzortungLoaded } from './lightning-helpers';
 import { getSourceCaps, getEffectiveTimeRange } from './source-caps';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -453,6 +454,7 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
     const parts: string[] = [];
     if (config.show_wildfires === true) parts.push(localize('ui.region_warning.label.wildfires'));
     if (config.show_alerts === true) parts.push(localize('ui.region_warning.label.alerts'));
+    if (config.show_lightning === true) parts.push(localize('editor.overlays.lightning_label'));
     if (parts.length === 0) return localize('editor.overlays.none_enabled');
     return parts.join(', ');
   }
@@ -527,7 +529,41 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
           <p class="section-description" style="margin-top:12px">${localize('editor.overlays.alerts_categories_label')}</p>
           ${this._renderAlertCategoryToggles(config)}
         ` : ''}
+
+        <!-- LIGHTNING -->
+        ${this._renderLightningSection(config)}
       </div>
+    `;
+  }
+
+  // Lightning row. Toggle is greyed out (same disabled-row pattern as
+  // square_map) when the Blitzortung integration isn't loaded — the
+  // overlay can't render without it. The max-age field is the
+  // card-side cap, distinct from the integration's own max-age.
+  private _renderLightningSection(config: WeatherRadarCardConfig): TemplateResult {
+    const integrationLoaded = isBlitzortungLoaded(this.hass);
+    return html`
+      <h3 class="section-header">${localize('editor.overlays.lightning_header')}</h3>
+      <p class="section-description">${localize('editor.overlays.lightning_description')}</p>
+      <label class=${integrationLoaded ? '' : 'disabled-row'}
+             title=${integrationLoaded ? '' : localize('editor.overlays.lightning_integration_required')}>
+        <ha-switch
+          .checked=${config.show_lightning === true}
+          .disabled=${!integrationLoaded}
+          .configValue=${'show_lightning'}
+          @change=${this._valueChangedSwitch}
+        ></ha-switch>
+        <span>${localize('editor.display.show_lightning')}</span>
+      </label>
+      ${config.show_lightning === true && integrationLoaded ? html`
+        <ha-textfield
+          label=${localize('editor.overlays.lightning_max_age_minutes')}
+          .value=${config.lightning_max_age_minutes !== undefined ? String(config.lightning_max_age_minutes) : ''}
+          helper=${localize('editor.overlays.lightning_max_age_minutes_helper')}
+          .configValue=${'lightning_max_age_minutes'}
+          @input=${this._valueChangedNumber}
+        ></ha-textfield>
+      ` : ''}
     `;
   }
 

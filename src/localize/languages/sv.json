@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Laddar radarrutor",
     "now": "(nu)",
-    "now_tooltip": "Nu"
+    "now_tooltip": "Nu",
+    "lightning": {
+      "popup_title": "Blixtnedslag",
+      "source_label": "Källa: Blitzortung",
+      "more_info": "Mer info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NO",
+        "e": "O",
+        "se": "SO",
+        "s": "S",
+        "sw": "SV",
+        "w": "V",
+        "nw": "NV"
+      },
+      "relative": {
+        "just_now": "just nu",
+        "seconds_ago": "{n} s sedan",
+        "minutes_ago": "{n} min sedan",
+        "hours_ago": "{n} h sedan"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Okänd"
       },
       "square_map_disabled_helper": "Inaktiverad när en höjd är angiven eller kortet ligger i en sections-rutnätscell med ett fast antal rader — dessa begränsningar fixerar redan kortets höjd.",
-      "show_loading_spinner": "Visa laddningsindikator"
+      "show_loading_spinner": "Visa laddningsindikator",
+      "show_lightning": "Visa blixtar (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Inaktivera rullning (tillåt sidsvep genom kartan)",
@@ -181,7 +203,13 @@
         "wind": "Vind",
         "marine": "Marint",
         "other": "Övrigt"
-      }
+      },
+      "lightning_header": "Blixtar (Blitzortung)",
+      "lightning_description": "Blixtnedslag i realtid från Blitzortung-integrationen. Nedslagen visas som en kort blixt, sedan som ett färgat +-tecken som åldras från vitt → gult → orange → rött.",
+      "lightning_integration_required": "Kräver Blitzortung-integrationen — installera den först i Home Assistant.",
+      "lightning_max_age_minutes": "Dölj nedslag äldre än (minuter)",
+      "lightning_max_age_minutes_helper": "Begränsning på kortets sida. Standard 30. Ändrar inte Blitzortung-integrationens egen max-ålderinställning.",
+      "lightning_label": "Blixtar"
     }
   }
 }
