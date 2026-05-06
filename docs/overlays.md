@@ -21,15 +21,15 @@ The overlay refreshes every 5 minutes when fires are visible (matching NIFC's up
 
 ### Wildfire knobs
 
-| Field                      | Default      | Description                                                                |
-| -------------------------- | ------------ | -------------------------------------------------------------------------- |
-| `show_wildfires`           | `false`      | Enable the overlay                                                         |
-| `wildfire_min_acres`       | `10`         | Hide incidents smaller than this acreage                                   |
-| `wildfire_radius_km`       | unset        | Only show fires within N km of the map center                              |
-| `wildfire_color`           | `'#ff3300'`  | Active fire colour (stroke + icon)                                         |
-| `wildfire_contained_color` | `'#888888'`  | 100%-contained fire colour                                                 |
-| `wildfire_fill_opacity`    | `0.2`        | Polygon fill opacity (`0` = perimeter only)                                |
-| `wildfire_refresh_minutes` | adaptive     | Override the adaptive 5/30-min refresh interval                            |
+| Field                      | Default     | Description                                     |
+|----------------------------|-------------|-------------------------------------------------|
+| `show_wildfires`           | `false`     | Enable the overlay                              |
+| `wildfire_min_acres`       | `10`        | Hide incidents smaller than this acreage        |
+| `wildfire_radius_km`       | unset       | Only show fires within N km of the map center   |
+| `wildfire_color`           | `'#ff3300'` | Active fire colour (stroke + icon)              |
+| `wildfire_contained_color` | `'#888888'` | 100%-contained fire colour                      |
+| `wildfire_fill_opacity`    | `0.2`       | Polygon fill opacity (`0` = perimeter only)     |
+| `wildfire_refresh_minutes` | adaptive    | Override the adaptive 5/30-min refresh interval |
 
 ## NWS Watches & Warnings
 
@@ -61,12 +61,35 @@ Both polygon-bearing alerts (most warnings) and zone-based alerts (most advisori
 
 ### Alert knobs
 
-| Field                    | Default             | Description                                                                                                                                                              |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `show_alerts`            | `false`             | Enable the overlay                                                                                                                                                       |
-| `alerts_categories`      | all except `marine` | Allowlist of category keys (`tornado`, `thunderstorm`, `flood`, `winter`, `tropical`, `fire_weather`, `heat`, `wind`, `marine`, `other`).                                |
-| `alerts_types`           | unset               | Explicit event-string allowlist; overrides `alerts_categories` when set                                                                                                  |
-| `alerts_min_severity`    | `'Minor'`           | One of `Extreme`, `Severe`, `Moderate`, `Minor`, `Unknown`. Hides alerts below the chosen severity floor.                                                                |
-| `alerts_radius_km`       | unset               | Only show alerts within N km of the map center                                                                                                                           |
-| `alerts_fill_opacity`    | `0.25`              | Alert polygon fill opacity (`0` = outline only)                                                                                                                          |
-| `alerts_refresh_seconds` | adaptive            | Override the adaptive 60s/300s refresh interval                                                                                                                          |
+| Field                    | Default             | Description                                                                                                                               |
+|--------------------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `show_alerts`            | `false`             | Enable the overlay                                                                                                                        |
+| `alerts_categories`      | all except `marine` | Allowlist of category keys (`tornado`, `thunderstorm`, `flood`, `winter`, `tropical`, `fire_weather`, `heat`, `wind`, `marine`, `other`). |
+| `alerts_types`           | unset               | Explicit event-string allowlist; overrides `alerts_categories` when set                                                                   |
+| `alerts_min_severity`    | `'Minor'`           | One of `Extreme`, `Severe`, `Moderate`, `Minor`, `Unknown`. Hides alerts below the chosen severity floor.                                 |
+| `alerts_radius_km`       | unset               | Only show alerts within N km of the map center                                                                                            |
+| `alerts_fill_opacity`    | `0.25`              | Alert polygon fill opacity (`0` = outline only)                                                                                           |
+| `alerts_refresh_seconds` | adaptive            | Override the adaptive 60s/300s refresh interval                                                                                           |
+
+## Lightning (Blitzortung)
+
+When `show_lightning: true` *and* the [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) is loaded in Home Assistant, the card overlays live lightning strikes from the integration's `geo_location.lightning_strike_*` entities. No external HTTP from the card — the integration handles all the data plumbing (WebSocket polling, distance filtering, age-capping); the card just renders.
+
+Each strike appears as a brief flash with a lightning-bolt icon (the "happening now!" indicator), and after 30 s settles into a coloured **+** sign. The + sign's fill colour ages through Blitzortung's web-map gradient: white → yellow → orange → coral → red → dark red, mirroring the visual language users coming from [their map](https://map.blitzortung.org/) already know. Newer strikes always paint on top of older ones.
+
+The toggle in the editor's Hazard Overlays subpage is greyed out when the Blitzortung integration isn't loaded, with a tooltip explaining that the integration must be installed first.
+
+### Lightning knobs
+
+| Field                       | Default | Description                                                                                                                                                                                                    |
+|-----------------------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `show_lightning`            | `false` | Enable the overlay                                                                                                                                                                                             |
+| `lightning_max_age_minutes` | `30`    | Hide strikes older than this many minutes. **Card-side cap only — does NOT change the Blitzortung integration's own max-age setting**, which the integration itself controls and may differ (default 120 min). |
+| `lightning_pulse`           | `true`  | One-shot brightness flash on new-strike appearance. Honours `prefers-reduced-motion`.                                                                                                                          |
+| `lightning_icon_size`       | `14`    | YAML-only. Pixel size for the + sign; the bolt renders at 1.3× this size.                                                                                                                                      |
+
+> [!NOTE]
+> The card's `lightning_max_age_minutes` is purely a display filter — it doesn't tell the Blitzortung integration to drop entities. The integration's own max-age setting (configured in HA → Integrations → Blitzortung) is the upper bound; the card's cap is whichever is smaller. Strikes you've hidden via the card cap are still in `hass.states` and visible in the integration's sidebar.
+
+> [!WARNING]
+> Blitzortung is a community-run, free, best-effort lightning detection network. Coverage and accuracy vary regionally. **Not for life-safety decisions** — use NOAA Weather Radio, official storm warnings, or your local emergency channels for those.

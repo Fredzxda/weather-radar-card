@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Radartegels laden",
     "now": "(nu)",
-    "now_tooltip": "Nu"
+    "now_tooltip": "Nu",
+    "lightning": {
+      "popup_title": "Bliksemtreffer",
+      "source_label": "Bron: Blitzortung",
+      "more_info": "Meer info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NO",
+        "e": "O",
+        "se": "ZO",
+        "s": "Z",
+        "sw": "ZW",
+        "w": "W",
+        "nw": "NW"
+      },
+      "relative": {
+        "just_now": "zojuist",
+        "seconds_ago": "{n} s geleden",
+        "minutes_ago": "{n} min geleden",
+        "hours_ago": "{n} u geleden"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Onbekend"
       },
       "square_map_disabled_helper": "Uitgeschakeld wanneer een hoogte is ingesteld of de kaart in een sections-rastercel met een vast aantal rijen staat — die beperkingen leggen de kaarthoogte al vast.",
-      "show_loading_spinner": "Laadindicator weergeven"
+      "show_loading_spinner": "Laadindicator weergeven",
+      "show_lightning": "Bliksem weergeven (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Scrollen uitschakelen (laat pagina door kaart vegen)",
@@ -181,7 +203,13 @@
         "wind": "Wind",
         "marine": "Maritiem",
         "other": "Overig"
-      }
+      },
+      "lightning_header": "Bliksem (Blitzortung)",
+      "lightning_description": "Live bliksemtreffers van de Blitzortung-integratie. Inslagen verschijnen als een korte flits, daarna als een gekleurd +-teken dat vergrijst van wit → geel → oranje → rood.",
+      "lightning_integration_required": "Vereist de Blitzortung-integratie — installeer deze eerst in Home Assistant.",
+      "lightning_max_age_minutes": "Verberg inslagen ouder dan (minuten)",
+      "lightning_max_age_minutes_helper": "Kaart-zijdige begrenzing. Standaard 30. Verandert de max-leeftijd-instelling van de Blitzortung-integratie niet.",
+      "lightning_label": "Bliksem"
     }
   }
 }

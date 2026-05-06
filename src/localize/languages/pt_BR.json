@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Carregando blocos de radar",
     "now": "(agora)",
-    "now_tooltip": "Agora"
+    "now_tooltip": "Agora",
+    "lightning": {
+      "popup_title": "Impacto de raio",
+      "source_label": "Fonte: Blitzortung",
+      "more_info": "Mais info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NE",
+        "e": "L",
+        "se": "SE",
+        "s": "S",
+        "sw": "SO",
+        "w": "O",
+        "nw": "NO"
+      },
+      "relative": {
+        "just_now": "agora mesmo",
+        "seconds_ago": "há {n} s",
+        "minutes_ago": "há {n} min",
+        "hours_ago": "há {n} h"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Desconhecida"
       },
       "square_map_disabled_helper": "Desativado quando uma altura é definida ou o cartão está em uma célula de grade de seções com número fixo de linhas — essas restrições já fixam a altura do cartão.",
-      "show_loading_spinner": "Mostrar indicador de carregamento"
+      "show_loading_spinner": "Mostrar indicador de carregamento",
+      "show_lightning": "Mostrar raios (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Desativar rolagem (permite deslizar a página sobre o mapa)",
@@ -181,7 +203,13 @@
         "wind": "Vento",
         "marine": "Marinho",
         "other": "Outros"
-      }
+      },
+      "lightning_header": "Raios (Blitzortung)",
+      "lightning_description": "Raios em tempo real da integração Blitzortung. Os impactos aparecem como um breve flash, depois como um sinal + colorido que envelhece de branco → amarelo → laranja → vermelho.",
+      "lightning_integration_required": "Requer a integração Blitzortung — instale-a primeiro no Home Assistant.",
+      "lightning_max_age_minutes": "Ocultar raios mais antigos que (minutos)",
+      "lightning_max_age_minutes_helper": "Limite no lado do cartão. Padrão 30. Não altera a configuração de idade máxima da integração Blitzortung.",
+      "lightning_label": "Raios"
     }
   }
 }

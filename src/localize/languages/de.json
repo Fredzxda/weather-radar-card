@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Radarkacheln werden geladen",
     "now": "(jetzt)",
-    "now_tooltip": "Jetzt"
+    "now_tooltip": "Jetzt",
+    "lightning": {
+      "popup_title": "Blitzeinschlag",
+      "source_label": "Quelle: Blitzortung",
+      "more_info": "Mehr Info → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NO",
+        "e": "O",
+        "se": "SO",
+        "s": "S",
+        "sw": "SW",
+        "w": "W",
+        "nw": "NW"
+      },
+      "relative": {
+        "just_now": "gerade eben",
+        "seconds_ago": "vor {n} s",
+        "minutes_ago": "vor {n} min",
+        "hours_ago": "vor {n} h"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Unbekannt"
       },
       "square_map_disabled_helper": "Deaktiviert, wenn eine Höhe festgelegt ist oder die Karte in einer Sections-Zelle mit fester Zeilenanzahl liegt — diese Beschränkungen legen die Kartenhöhe bereits fest.",
-      "show_loading_spinner": "Ladeanzeige anzeigen"
+      "show_loading_spinner": "Ladeanzeige anzeigen",
+      "show_lightning": "Blitze anzeigen (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Scrollen deaktivieren (Seitenwischen über die Karte erlauben)",
@@ -181,7 +203,13 @@
         "wind": "Wind",
         "marine": "Marine",
         "other": "Sonstiges"
-      }
+      },
+      "lightning_header": "Blitze (Blitzortung)",
+      "lightning_description": "Live-Blitzeinschläge aus der Blitzortung-Integration. Einschläge erscheinen als kurzes Aufblitzen, danach als farbiges +-Zeichen, das von weiß über gelb und orange zu rot altert.",
+      "lightning_integration_required": "Erfordert die Blitzortung-Integration — installieren Sie sie zuerst in Home Assistant.",
+      "lightning_max_age_minutes": "Einschläge älter als (Minuten) ausblenden",
+      "lightning_max_age_minutes_helper": "Karten-seitige Begrenzung. Standard 30. Ändert nicht die Max-Age-Einstellung der Blitzortung-Integration.",
+      "lightning_label": "Blitze"
     }
   }
 }

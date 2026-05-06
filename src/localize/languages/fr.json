@@ -39,7 +39,28 @@
     },
     "loading_radar_tiles": "Chargement des tuiles radar",
     "now": "(maintenant)",
-    "now_tooltip": "Maintenant"
+    "now_tooltip": "Maintenant",
+    "lightning": {
+      "popup_title": "Impact de foudre",
+      "source_label": "Source : Blitzortung",
+      "more_info": "Plus d’infos → Blitzortung",
+      "bearing": {
+        "n": "N",
+        "ne": "NE",
+        "e": "E",
+        "se": "SE",
+        "s": "S",
+        "sw": "SO",
+        "w": "O",
+        "nw": "NO"
+      },
+      "relative": {
+        "just_now": "à l’instant",
+        "seconds_ago": "il y a {n} s",
+        "minutes_ago": "il y a {n} min",
+        "hours_ago": "il y a {n} h"
+      }
+    }
   },
   "editor": {
     "section": {
@@ -126,7 +147,8 @@
         "unknown": "Inconnue"
       },
       "square_map_disabled_helper": "Désactivé lorsqu'une hauteur est définie ou que la carte est dans une cellule de grille de sections avec un nombre de lignes fixe — ces contraintes fixent déjà la hauteur de la carte.",
-      "show_loading_spinner": "Afficher l’indicateur de chargement"
+      "show_loading_spinner": "Afficher l’indicateur de chargement",
+      "show_lightning": "Afficher la foudre (Blitzortung)"
     },
     "interaction": {
       "disable_scroll": "Désactiver le défilement (permet le balayage de la page sur la carte)",
@@ -181,7 +203,13 @@
         "wind": "Vent",
         "marine": "Marin",
         "other": "Autre"
-      }
+      },
+      "lightning_header": "Foudre (Blitzortung)",
+      "lightning_description": "Impacts de foudre en direct depuis l’intégration Blitzortung. Les impacts apparaissent par un bref éclair, puis un signe + coloré qui vieillit du blanc au jaune, à l’orange et au rouge.",
+      "lightning_integration_required": "Nécessite l’intégration Blitzortung — installez-la d’abord dans Home Assistant.",
+      "lightning_max_age_minutes": "Masquer les impacts plus anciens que (minutes)",
+      "lightning_max_age_minutes_helper": "Limite côté carte. Par défaut 30. Ne modifie pas le paramètre d’âge maximal de l’intégration Blitzortung.",
+      "lightning_label": "Foudre"
     }
   }
 }
