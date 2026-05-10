@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0-alpha4] - 2026-05-10
+
+> Lands @genericJE's DWD coverage-overlay fix (originally [PR #132](https://github.com/Makin-Things/weather-radar-card/pull/132), brought across as [PR #141](https://github.com/Makin-Things/weather-radar-card/pull/141)) — the per-frame snap-switched mask that kills the cross-fade pulse on the DWD coverage outline.
+
+### Fixed
+
+- **DWD coverage-mask cross-fade pulse.** The grey "no-data" wash and magenta coverage outline that DWD's WMS bakes into every Niederschlagsradar / Radar_wn tile were stacking during the per-frame cross-fade — two semi-transparent layers compounded the dim and produced a visible pulse on the boundary every animation tick. Two-part fix: strip the mask + outline at fetch time via a new `pixelFilter` option on `FetchTileOptions`, then re-render the boundary as a separate snap-switched overlay on a dedicated Leaflet pane (z-index 350) so it doesn't participate in the cross-fade. Per-frame mask layers (rather than a single static one) so radar-station outages track correctly. Tested in the wild against the Feldberg outage at 08:25 UTC. Contributed by [@genericJE](https://github.com/genericJE).
+
+### Added
+
+- **Two CSS theme variables** for the coverage overlay colours — set either to `transparent` to hide:
+  - `--dwd-coverage-dim-color` (default `rgba(0, 0, 0, 1)`)
+  - `--dwd-coverage-outline-color` (default `rgba(255, 0, 255, 1)`)
+
+  RGB picks the colour, alpha multiplies the original mask alpha so wash density and outline antialiasing both scale.
+
+### Tests
+
+329 → **347**. New: 18 cases for `classifyDwdPixel` (the heart of the mask-stripping pipeline — opaque palette purples per palette, canonical magenta-outline rule, off-palette purple-shape blends, equal-channel grey, canonical radar palette colours that should pass through, brightness-floor and saturation-shape boundary cases, semi-transparent edges, the 15-unit drift threshold for grey detection) plus 3 cases for `dwdPaletteFor` (layer-name → palette mapping). Pin against DWD palette drift — if their colour ramp ever changes, the strict-match whitelist will silently mis-classify, and these tests catch it.
+
 ## [3.6.0-alpha3] - 2026-05-07
 
 > Two NWS-layer improvements: a smarter paint order for overlapping alerts, plus an XSS-hardening pass on every popup `href` interpolation. Same-day fix-and-improvement release for the 3.6 alpha track.
@@ -401,7 +421,8 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
-[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha3...HEAD
+[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha4...HEAD
+[3.6.0-alpha4]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha3...v3.6.0-alpha4
 [3.6.0-alpha3]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha2...v3.6.0-alpha3
 [3.6.0-alpha2]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-alpha1...v3.6.0-alpha2
 [3.6.0-alpha1]: https://github.com/Makin-Things/weather-radar-card/compare/v3.5.0...v3.6.0-alpha1
