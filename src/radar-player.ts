@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as L from 'leaflet';
 import { WeatherRadarCardConfig } from './types';
+import { Z_RADAR_BASE } from './const';
 import { RateLimiter } from './rate-limiter';
 import { FetchTileLayer, FetchWmsTileLayer, layerSettled } from './fetch-tile-layer';
 import { RadarToolbar } from './radar-toolbar';
@@ -552,7 +553,7 @@ export class RadarPlayer {
     // to delay, so the chain logic collapses: snap new to active, snap
     // all others to 0. Single layer always visible.
     this._zCounter++;
-    const newZ = 100 + this._zCounter;
+    const newZ = Z_RADAR_BASE + this._zCounter;
     const prev1 = this._prev1Slot;
     const useChain = fade > 0;
 

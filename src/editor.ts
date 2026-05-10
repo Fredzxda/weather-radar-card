@@ -80,7 +80,7 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
   // Which sub-view of the editor is showing. Defaults to 'main' (the
   // top-level settings). Routing happens entirely in-memory — closing and
   // re-opening the editor returns to 'main', matching HA editor conventions.
-  @state() private _view: 'main' | 'markers' | 'overlays' = 'main';
+  @state() private _view: 'main' | 'markers' | 'overlays' | 'wind' = 'main';
 
   private _initialized = false;
 
@@ -144,6 +144,7 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
     if (!this._config) return html``;
     if (this._view === 'markers') return this._renderMarkersView(this._config);
     if (this._view === 'overlays') return this._renderOverlaysView(this._config);
+    if (this._view === 'wind') return this._renderWindView(this._config);
     return this._renderMainView(this._config);
   }
 
@@ -252,6 +253,16 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
           <span class="subpage-nav-summary">${this._overlaysSummary(config)}</span>
           <span class="subpage-nav-chevron">›</span>
         </button>
+        ${config.data_source === 'DWD' ? html`
+          <button
+            class="subpage-nav-row"
+            @click=${() => this._setView('wind')}
+          >
+            <span class="subpage-nav-label">${localize('editor.section.wind_overlay')}</span>
+            <span class="subpage-nav-summary">${this._windSummary(config)}</span>
+            <span class="subpage-nav-chevron">›</span>
+          </button>
+        ` : ''}
 
         <!-- DISPLAY -->
         <h3 class="section-header">${localize('editor.section.display')}</h3>
@@ -459,6 +470,81 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
     return parts.join(', ');
   }
 
+  // Right-hand summary for the Wind Overlay nav row. Stacks the active
+  // layers ("Barbs + Flow") so the user can see the current state without
+  // entering the subpage.
+  private _windSummary(config: WeatherRadarCardConfig): string {
+    const parts: string[] = [];
+    const style = config.dwd_wind ?? 'off';
+    if (style === 'barbs') parts.push(localize('editor.wind.summary_barbs'));
+    else if (style === 'arrows') parts.push(localize('editor.wind.summary_arrows'));
+    if (config.dwd_wind_flow === true) parts.push(localize('editor.wind.summary_flow'));
+    if (parts.length === 0) return localize('editor.wind.summary_off');
+    return parts.join(' + ');
+  }
+
+  private _renderWindView(config: WeatherRadarCardConfig): TemplateResult {
+    const style = config.dwd_wind ?? 'off';
+    return html`
+      <div class="values">
+        <button class="subpage-back" @click=${() => this._setView('main')}>
+          ‹ ${localize('editor.wind.back')}
+        </button>
+
+        <h3 class="section-header">${localize('editor.wind.header')}</h3>
+        <p class="section-description">${localize('editor.wind.description')}</p>
+
+        <ha-selector
+          .hass=${this.hass}
+          .selector=${{
+            select: {
+              mode: 'dropdown',
+              options: [
+                { value: 'off', label: localize('editor.wind.style_off') },
+                { value: 'barbs', label: localize('editor.wind.style_barbs') },
+                { value: 'arrows', label: localize('editor.wind.style_arrows') },
+              ],
+            },
+          }}
+          .value=${style}
+          .label=${localize('editor.wind.style_label')}
+          .configValue=${'dwd_wind'}
+          @value-changed=${this._handleSelectorChanged}
+        ></ha-selector>
+
+        ${style !== 'off' ? html`
+          <ha-selector
+            .hass=${this.hass}
+            .selector=${{ number: { min: 0.25, max: 4, step: 0.25, mode: 'slider' } }}
+            .value=${config.dwd_wind_density ?? 1}
+            .label=${localize('editor.wind.density_label')}
+            .helper=${localize('editor.wind.density_helper')}
+            .configValue=${'dwd_wind_density'}
+            @value-changed=${this._handleSelectorChanged}
+          ></ha-selector>
+          <ha-selector
+            .hass=${this.hass}
+            .selector=${{ number: { min: 0.5, max: 2, step: 0.25, mode: 'slider' } }}
+            .value=${config.dwd_wind_size ?? 1}
+            .label=${localize('editor.wind.size_label')}
+            .helper=${localize('editor.wind.size_helper')}
+            .configValue=${'dwd_wind_size'}
+            @value-changed=${this._handleSelectorChanged}
+          ></ha-selector>
+        ` : ''}
+
+        <label>
+          <ha-switch
+            .checked=${config.dwd_wind_flow === true}
+            .configValue=${'dwd_wind_flow'}
+            @change=${this._valueChangedSwitch}
+          ></ha-switch>
+          <span>${localize('editor.wind.flow_label')}</span>
+        </label>
+      </div>
+    `;
+  }
+
   private _renderOverlaysView(config: WeatherRadarCardConfig): TemplateResult {
     return html`
       <div class="values">
@@ -619,7 +705,7 @@ export class WeatherRadarCardEditor extends LitElement implements LovelaceCardEd
     `;
   }
 
-  private _setView(view: 'main' | 'markers' | 'overlays'): void {
+  private _setView(view: 'main' | 'markers' | 'overlays' | 'wind'): void {
     this._view = view;
     // Scroll the editor pane back to the top so the user always lands at the
     // start of the new view, not part-way down where they were on the old one.

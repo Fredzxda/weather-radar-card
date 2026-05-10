@@ -91,6 +91,14 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
   dwd_layer?: string;
   /** @deprecated since 3.5: use forecast_minutes (source-agnostic). Auto-migrated by migrateConfig. */
   dwd_forecast_hours?: number;
+  /** DWD-only: 10m wind overlay from ICON. Both styles are client-rendered from the same U/V grid. */
+  dwd_wind?: 'off' | 'barbs' | 'arrows';
+  /** DWD-only: grid-density multiplier for the wind overlay (0.25–4). 1 = default. Higher = more arrows on screen. */
+  dwd_wind_density?: number;
+  /** DWD-only: icon-size multiplier for the wind overlay (0.5–2). 1 = default 22px. */
+  dwd_wind_size?: number;
+  /** DWD-only: animated wind streamline overlay (à la DWD WarnWetter app). Stacks with dwd_wind. */
+  dwd_wind_flow?: boolean;
   show_snow?: boolean;
   show_progress_bar?: boolean;
   show_color_bar?: boolean;

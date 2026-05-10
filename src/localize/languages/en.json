@@ -72,6 +72,7 @@
       "animation": "Animation",
       "appearance": "Appearance",
       "overlays": "Hazard Overlays",
+      "wind_overlay": "Wind Overlay",
       "markers_and_overlays": "Markers and Overlays"
     },
     "map": {
@@ -212,6 +213,24 @@
       "lightning_max_age_minutes": "Hide strikes older than (minutes)",
       "lightning_max_age_minutes_helper": "Card-side cap. Default 30. Does not change the Blitzortung integration’s own max-age setting.",
       "lightning_label": "Lightning"
+    },
+    "wind": {
+      "back": "Back to settings",
+      "header": "Wind Overlay (DWD ICON 10m)",
+      "description": "10m wind from the ICON forecast model. Pick a static style and/or animated streamlines.",
+      "style_label": "Style",
+      "style_off": "Off",
+      "style_barbs": "Wind Barbs (meteorological)",
+      "style_arrows": "Wind Arrows (downwind)",
+      "density_label": "Density",
+      "density_helper": "Higher = more arrows on screen",
+      "size_label": "Size",
+      "size_helper": "Higher = larger arrows",
+      "flow_label": "Animated Streamlines (flow)",
+      "summary_off": "Off",
+      "summary_barbs": "Barbs",
+      "summary_arrows": "Arrows",
+      "summary_flow": "Flow"
     }
   }
 }

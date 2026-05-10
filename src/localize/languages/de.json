@@ -72,6 +72,7 @@
       "animation": "Animation",
       "appearance": "Aussehen",
       "overlays": "Gefahren-Overlays",
+      "wind_overlay": "Wind-Overlay",
       "markers_and_overlays": "Markierungen und Overlays"
     },
     "map": {
@@ -212,6 +213,24 @@
       "lightning_max_age_minutes": "Einschläge älter als (Minuten) ausblenden",
       "lightning_max_age_minutes_helper": "Karten-seitige Begrenzung. Standard 30. Ändert nicht die Max-Age-Einstellung der Blitzortung-Integration.",
       "lightning_label": "Blitze"
+    },
+    "wind": {
+      "back": "Zurück zu den Einstellungen",
+      "header": "Wind-Overlay (DWD ICON 10m)",
+      "description": "10-m-Wind aus dem ICON-Vorhersagemodell. Wähle einen statischen Stil und/oder animierte Stromlinien.",
+      "style_label": "Stil",
+      "style_off": "Aus",
+      "style_barbs": "Windfähnchen (meteorologisch)",
+      "style_arrows": "Windpfeile (in Windrichtung)",
+      "density_label": "Dichte",
+      "density_helper": "Höher = mehr Pfeile auf der Karte",
+      "size_label": "Größe",
+      "size_helper": "Höher = größere Pfeile",
+      "flow_label": "Animierte Stromlinien (Flow)",
+      "summary_off": "Aus",
+      "summary_barbs": "Fähnchen",
+      "summary_arrows": "Pfeile",
+      "summary_flow": "Flow"
     }
   }
 }
