@@ -39,6 +39,126 @@ const DWD_WMS_LAYER_DEFAULT = 'Niederschlagsradar';
 // Frames usually appear 1–3 min after their timestamp; 5 min is safely past the lag.
 const DWD_LAG_MS = 5 * 60 * 1000;
 
+// DWD's WMS tiles bake a "no-data" mask into every frame — grey wash
+// (rgba 126,126,126,77) outside coverage, magenta outline (G=0, B=255)
+// at the boundary. Two crossfading layers compound the dim into a
+// visible pulse, so we strip them at fetch time and re-render the
+// boundary as a separate, snap-switched overlay (`makeDwdMaskOnlyFilter`).
+//
+// The hard part is telling outline-on-data antialiasing blends apart
+// from the palette purples DWD uses for very heavy rain. Both fall in
+// the same RGB neighbourhood, so we whitelist palette entries by exact
+// triple — the legend only has a handful and they're stable per layer.
+// Anything else with G low and R, B both bright is treated as outline.
+// Exported for unit-test access — same pattern as nearestFrameIndex
+// above. Not part of the public API; consumers should use
+// makeDwdMaskFilter / makeDwdMaskOnlyFilter instead.
+export const WN_PALETTE_PURPLES = new Set<number>([
+  (153 << 16) | (0 << 8) | 153,
+  (255 << 16) | (51 << 8) | 255,
+]);
+export const RV_PALETTE_PURPLES = new Set<number>([
+  (204 << 16) | (0 << 8) | 152,
+  (102 << 16) | (0 << 8) | 203,
+]);
+
+export function dwdPaletteFor(layerName: string): Set<number> {
+  return layerName.startsWith('Radar_wn-') ? WN_PALETTE_PURPLES : RV_PALETTE_PURPLES;
+}
+
+export type DwdPixelKind = 'data' | 'grey' | 'outline';
+
+// Classify a single pixel. Shared by the data filter (drops everything
+// that isn't 'data') and the mask-only filter (drops 'data', recolours
+// the rest).
+//
+// Exported for testability — the classifier is the most fragile piece
+// of the DWD mask-stripping pipeline (RGB-indistinguishable palette
+// purples vs outline blends, exact-triple whitelist) and worth pinning
+// against DWD palette drift.
+export function classifyDwdPixel(
+  r: number, g: number, b: number, a: number,
+  paletteKeys: Set<number>,
+): DwdPixelKind {
+  if (a < 255) {
+    // Semi-transparent ⇒ an antialiased mask edge. Wash edges keep
+    // R≈G≈B; magenta-blend edges don't.
+    return Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 ? 'grey' : 'outline';
+  }
+  if (r === g && g === b) return 'grey';
+  if (g === 0 && b === 255) return 'outline';
+  // Purple-shape: G is the smallest channel, R and B both bright. Any
+  // such pixel that's not a palette entry is an outline-on-data blend.
+  if (g < 120 && r > 50 && b > 50 && r > g && b > g) {
+    const key = (r << 16) | (g << 8) | b;
+    if (!paletteKeys.has(key)) return 'outline';
+  }
+  return 'data';
+}
+
+function makeDwdMaskFilter(layerName: string): (data: Uint8ClampedArray) => void {
+  const palette = dwdPaletteFor(layerName);
+  return (data) => {
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] === 0) continue;
+      if (classifyDwdPixel(data[i], data[i + 1], data[i + 2], data[i + 3], palette) !== 'data') {
+        data[i + 3] = 0;
+      }
+    }
+  };
+}
+
+// Inverse of makeDwdMaskFilter: drop radar data, keep the mask, and
+// recolour to theme-controlled RGBA. Original alpha is multiplied by
+// the themed alpha so wash density and outline antialiasing both
+// respond proportionally.
+function makeDwdMaskOnlyFilter(
+  layerName: string,
+  dim: readonly [number, number, number, number],
+  outline: readonly [number, number, number, number],
+): (data: Uint8ClampedArray) => void {
+  const palette = dwdPaletteFor(layerName);
+  return (data) => {
+    for (let i = 0; i < data.length; i += 4) {
+      const origA = data[i + 3];
+      if (origA === 0) continue;
+      const kind = classifyDwdPixel(data[i], data[i + 1], data[i + 2], origA, palette);
+      if (kind === 'data') { data[i + 3] = 0; continue; }
+      const c = kind === 'grey' ? dim : outline;
+      data[i] = c[0];
+      data[i + 1] = c[1];
+      data[i + 2] = c[2];
+      data[i + 3] = Math.round((origA * c[3]) / 255);
+    }
+  };
+}
+
+// Parse any CSS colour ("rgba(0,0,0,0.3)", "#ff00ff", "magenta",
+// "transparent", …) into [r, g, b, a] bytes via the canvas 2D context.
+// Returns null if the string didn't parse — assigning an invalid value
+// to fillStyle leaves the previous (sentinel) value unchanged.
+function parseCssColor(value: string): [number, number, number, number] | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return null;
+  const sentinel = '#010203';
+  ctx.fillStyle = sentinel;
+  ctx.fillStyle = trimmed;
+  if (ctx.fillStyle === sentinel && trimmed.toLowerCase() !== sentinel) return null;
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillRect(0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return [d[0], d[1], d[2], d[3]];
+}
+
+// Leaflet's tile-layer container is the DOM element holding the
+// rendered tiles — this is where we apply opacity for the snap-switch.
+// Typed loosely because the public API doesn't expose `getContainer`.
+function layerEl(layer: { getContainer?: () => HTMLElement | null } | null | undefined): HTMLElement | null {
+  return layer?.getContainer?.() ?? null;
+}
+
 export interface RadarPlayerOptions {
   map: L.Map;
   shadowRoot: ShadowRoot;
@@ -64,6 +184,16 @@ export class RadarPlayer {
   private _noaaLimiter: RateLimiter;
   private _dwdLimiter: RateLimiter;
   private _dwdSwapLogged = false;
+
+  // Per-frame coverage overlay (DWD only). Parallel to _radarImage,
+  // each entry fetches the same WMS layer at the matching frame's TIME
+  // with makeDwdMaskOnlyFilter so only the wash + outline survive
+  // (recoloured to theme variables). _showSlot snap-switches visibility
+  // — never crossfades — so two stacked masks can't compound the dim.
+  private _radarMask: (FetchWmsTileLayer | null)[] = [];
+  private _dwdMaskPaneCreated = false;
+  private _dwdDimRgba: [number, number, number, number] | null = null;
+  private _dwdOutlineRgba: [number, number, number, number] | null = null;
 
   private _radarImage: (FetchTileLayer | FetchWmsTileLayer)[] = [];
   // Date + time stored as separate parts so the bottom row can hide the
@@ -466,6 +596,11 @@ export class RadarPlayer {
 
     this._prev1Slot = slot;
 
+    // Coverage overlay snap-switch — only the new slot's mask is visible.
+    // Done unconditionally; non-DWD sources have an empty _radarMask array
+    // and the loop is a no-op.
+    this._showDwdMaskForSlot(slot);
+
     const fi = this._loadedSlots[slot];
     if (fi !== undefined) {
       this._setTimestamp(fi);
@@ -618,6 +753,89 @@ export class RadarPlayer {
     // that no longer exist after a teardown + re-init.
     this._prev1Slot = -1;
     this._zCounter = 0;
+    this._clearDwdMaskLayers();
+  }
+
+  // Resolve the DWD WMS layer the player is currently using. Niederschlagsradar
+  // (the default) is past-only; when the user requests forecast hours, switch
+  // to the analysis+nowcast layer which carries +2h frames too.
+  private _dwdLayerName(): string {
+    const wantsForecast = (this._cfg.forecast_minutes ?? 0) > 0;
+    const autoSwap = wantsForecast && this._cfg.dwd_layer === undefined;
+    const name = this._cfg.dwd_layer
+      ?? (wantsForecast ? 'Radar_wn-product_1x1km_ger' : DWD_WMS_LAYER_DEFAULT);
+    if (autoSwap && !this._dwdSwapLogged) {
+      console.info(
+        `[weather-radar-card] forecast_minutes > 0; switched DWD layer ${DWD_WMS_LAYER_DEFAULT} (mm/h) → ${name} (dBZ) for nowcast frames. Set dwd_layer to override.`,
+      );
+      this._dwdSwapLogged = true;
+    }
+    return name;
+  }
+
+  // Dedicated Leaflet pane for the coverage overlay. z-index 350 sits
+  // above the basemap + radar tiles (tilePane = 200) and below SVG
+  // overlays / markers (overlayPane = 400).
+  private _ensureDwdMaskPane(): void {
+    if (this._dwdMaskPaneCreated || !this._map) return;
+    const pane = this._map.createPane('dwd-coverage-mask');
+    pane.style.zIndex = '350';
+    pane.style.pointerEvents = 'none';
+    this._dwdMaskPaneCreated = true;
+  }
+
+  // Cache the theme colours per init so 48 frames don't each call
+  // getComputedStyle.
+  private _refreshDwdMaskColors(): void {
+    const cs = getComputedStyle(this._shadowRoot.host as HTMLElement);
+    this._dwdDimRgba = parseCssColor(cs.getPropertyValue('--dwd-coverage-dim-color'))
+      ?? [0, 0, 0, 255];
+    this._dwdOutlineRgba = parseCssColor(cs.getPropertyValue('--dwd-coverage-outline-color'))
+      ?? [255, 0, 255, 255];
+  }
+
+  // Returns null if both theme colours are fully transparent — that's a
+  // valid opt-out from CSS, no need to make WMS requests for a layer
+  // that would render nothing.
+  private _createDwdMaskLayer(frame: RadarFrame, layerName: string): FetchWmsTileLayer | null {
+    const dim = this._dwdDimRgba;
+    const outline = this._dwdOutlineRgba;
+    if (!dim || !outline) return null;
+    if (dim[3] === 0 && outline[3] === 0) return null;
+    this._ensureDwdMaskPane();
+    const isoTime = new Date(frame.time * 1000).toISOString().split('.')[0] + 'Z';
+    const { size: tileSize, zoomOffset } = this._radarTileSize();
+    return new FetchWmsTileLayer(DWD_WMS_URL, {
+      layers: layerName,
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      TIME: isoTime,
+      tileSize,
+      zoomOffset,
+      maxNativeZoom: 8 + Math.max(0, -zoomOffset),
+      rateLimiter: this._dwdLimiter,
+      on429: () => this._onRateLimited(),
+      animationOwnsOpacity: true,
+      pane: 'dwd-coverage-mask',
+      pixelFilter: makeDwdMaskOnlyFilter(layerName, dim, outline),
+    } as any);
+  }
+
+  private _clearDwdMaskLayers(): void {
+    for (const layer of this._radarMask) layer?.remove();
+    this._radarMask = [];
+  }
+
+  // Show only the active slot's mask. No transition — two stacked masks
+  // during a data crossfade would compound the dim into a pulse.
+  private _showDwdMaskForSlot(slot: number): void {
+    for (let s = 0; s < this._loadedSlots.length; s++) {
+      const el = layerEl(this._radarMask[this._loadedSlots[s]]);
+      if (!el) continue;
+      el.style.transition = 'none';
+      el.style.opacity = s === slot ? '1' : '0';
+    }
   }
 
   // ── Radar fetching ───────────────────────────────────────────────────────
@@ -728,17 +946,7 @@ export class RadarPlayer {
     }
     if (dataSource === 'DWD') {
       const isoTime = new Date(frame.time * 1000).toISOString().split('.')[0] + 'Z';
-      // Niederschlagsradar (default) is past-only. When the user has asked for forecast
-      // hours, switch to the analysis+nowcast layer which carries +2h frames too.
-      const wantsForecast = (this._cfg.forecast_minutes ?? 0) > 0;
-      const autoSwap = wantsForecast && this._cfg.dwd_layer === undefined;
-      const layerName = this._cfg.dwd_layer ?? (wantsForecast ? 'Radar_wn-product_1x1km_ger' : DWD_WMS_LAYER_DEFAULT);
-      if (autoSwap && !this._dwdSwapLogged) {
-        console.info(
-          `[weather-radar-card] forecast_minutes > 0; switched DWD layer ${DWD_WMS_LAYER_DEFAULT} (mm/h) → ${layerName} (dBZ) for nowcast frames. Set dwd_layer to override.`,
-        );
-        this._dwdSwapLogged = true;
-      }
+      const layerName = this._dwdLayerName();
       return wireSpinner(new FetchWmsTileLayer(DWD_WMS_URL, {
         layers: layerName,
         format: 'image/png',
@@ -755,6 +963,7 @@ export class RadarPlayer {
         rateLimiter: this._dwdLimiter,
         on429: () => this._onRateLimited(),
         animationOwnsOpacity: true,
+        pixelFilter: makeDwdMaskFilter(layerName),
       } as any));
     }
     const snow = this._cfg.show_snow ? 1 : 0;
@@ -818,6 +1027,13 @@ export class RadarPlayer {
     this._buildSegments();
     this._applyNowMarker();
 
+    const dwdActive = (this._cfg.data_source ?? 'RainViewer') === 'DWD';
+    if (dwdActive) {
+      this._refreshDwdMaskColors();
+      this._radarMask = new Array(frameCount).fill(null);
+    }
+    const dwdLayerName = dwdActive ? this._dwdLayerName() : '';
+
     let newestShown = false;
 
     for (let fi = frameCount - 1; fi >= 0; fi--) {
@@ -832,6 +1048,16 @@ export class RadarPlayer {
       const el = (layer as any).getContainer?.() as HTMLElement | undefined;
       if (el) el.style.opacity = '0';
 
+      if (dwdActive) {
+        const maskLayer = this._createDwdMaskLayer(this._radarPaths[fi], dwdLayerName);
+        if (maskLayer) {
+          this._radarMask[fi] = maskLayer;
+          maskLayer.addTo(this._map);
+          const maskEl = layerEl(maskLayer);
+          if (maskEl) maskEl.style.opacity = '0';
+        }
+      }
+
       const status = await layerSettled(layer);
       if (myGen !== this._frameGeneration) return;
 
@@ -845,6 +1071,10 @@ export class RadarPlayer {
           // Show newest frame as a static preview before the loop starts
           newestShown = true;
           if (el) el.style.opacity = this._activeOpacity;
+          // Surface the matching mask too, so the preview already has
+          // its in-sync coverage overlay before the loop begins.
+          const maskEl = layerEl(this._radarMask[fi]);
+          if (maskEl) maskEl.style.opacity = '1';
           this._setTimestamp(fi);
           this._highlightSegment(fi);
         }
@@ -906,16 +1136,29 @@ export class RadarPlayer {
     const newLayer = this._createLayer(latestFrame);
     newLayer.addTo(this._map);
     const newTime = this._getTimeString(latestFrame.time * 1000);
+    const dwdActive = (this._cfg.data_source ?? 'RainViewer') === 'DWD';
+    let newMask: FetchWmsTileLayer | null = null;
+    if (dwdActive) {
+      newMask = this._createDwdMaskLayer(latestFrame, this._dwdLayerName());
+      if (newMask) {
+        newMask.addTo(this._map);
+        const maskEl = layerEl(newMask);
+        if (maskEl) maskEl.style.opacity = '0';
+      }
+    }
 
     this._radarImage[0]?.remove();
+    this._radarMask[0]?.remove();
     // _radarPaths shifts alongside the others because nearestFrameIndex() reads .time off it.
     for (let i = 0; i < frameCount - 1; i++) {
       this._radarImage[i] = this._radarImage[i + 1];
+      this._radarMask[i] = this._radarMask[i + 1] ?? null;
       this._radarTime[i] = this._radarTime[i + 1];
       this._radarPaths[i] = this._radarPaths[i + 1];
       this._frameStatuses[i] = this._frameStatuses[i + 1];
     }
     this._radarImage[frameCount - 1] = newLayer;
+    this._radarMask[frameCount - 1] = newMask;
     this._radarTime[frameCount - 1] = newTime;
     this._radarPaths[frameCount - 1] = latestFrame;
     this._loadedSlots = this._loadedSlots.map(fi => fi - 1).filter(fi => fi >= 0);

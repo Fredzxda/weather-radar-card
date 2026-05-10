@@ -1027,7 +1027,14 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     unsafeCSS(leafletCss),
     unsafeCSS(markerClusterCss),
     css`
-      :host { display: block; isolation: isolate; height: 100%; }
+      :host {
+        display: block; isolation: isolate; height: 100%;
+        /* DWD coverage overlay theme hooks. RGB picks the colour, alpha
+           multiplies the original mask opacity (so wash density and outline
+           antialiasing both scale). Set to "transparent" to hide. */
+        --dwd-coverage-dim-color: rgba(0, 0, 0, 1);
+        --dwd-coverage-outline-color: rgba(255, 0, 255, 1);
+      }
       /* flex-mode is the default: ha-card fills its container vertically
          (sections-grid cell), with min-height set inline from the user's
          height config so a regular dashboard still renders at the
