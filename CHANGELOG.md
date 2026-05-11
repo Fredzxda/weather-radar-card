@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0-rc3] - 2026-05-11
+
+> Continuing rc-line tuning: replaces the `destination-out` accumulation rendering of the wind streamline overlay with explicit per-particle trail buffers, drops the animation rate to 15 fps (with motion compensation) for ~4× lower CPU, and adds a smooth fade-out at end-of-life and at the canvas edge. No new features; pure rendering rework. If nothing surfaces during the rc3 bake, this is what 3.6.0 ships as.
+
+### Changed
+
+- **Wind streamline rendering rewritten**: explicit per-particle ring buffer (60 positions per particle) replaces the previous `destination-out` per-frame alpha decay. Each frame the canvas is cleared and trails are redrawn from each particle's stored history. Eliminates the canvas-accumulation smudge at low zoom (no more opaque ink piling up faster than fade can clear), and gives precise control over when trails appear and disappear.
+- **Frame rate throttled to 15 fps** (was uncapped `requestAnimationFrame`, typically 60 Hz on modern displays). Per-second CPU drops by ~4×. Per-frame motion is scaled by actual elapsed-ms vs. a 30 fps reference so wall-clock head speed stays consistent with the previous tuning, and visible streak length doubles (each per-frame segment is now twice as long).
+- **Smooth end-of-life fade-out**: the last 15 frames (~1 sec at 15 fps) of every particle's life are rendered at decreasing alpha via a cubic ease-in (`1 - t³`). The cubic keeps early fade frames near full alpha so the transition from "fully alive" to "fading" is imperceptible — earlier linear-fade attempts produced a perceived "flash" at the transition. Particles continue moving during the fade so they "drift away" rather than freezing in place.
+- **Smooth fade at canvas edge**: particles drifting off-canvas previously triggered an immediate respawn — the on-canvas portion of the trail vanished in a single frame. Off-canvas detection now bumps the particle's age into the fade window so its visible portion dissipates over the same ~1 sec cubic ease.
+
+### Internal
+
+- Drawing splits into two passes for performance: fully alive particles batched per segment age (cheap, ~60 stroke calls/frame); fading particles drawn per-segment per-particle so each keeps its individual fade alpha (~10k stroke calls/frame at typical density, smooth at 15 fps).
+- Removed the destination-out fade infrastructure (`MIN/MAX_FADE_PER_FRAME`, `_fadePerFrame` field, `targetFade` calc).
+- New constants: `TRAIL_LENGTH = 60`, `TARGET_FPS = 15`, `MOTION_REFERENCE_FRAME_MS`, `FADE_OUT_FRAMES = 15`.
+
 ## [3.6.0-rc2] - 2026-05-11
 
 > Wind streamline tuning pass on top of rc1. Surfaced during rc1 testing: at low zoom (z3-5) the streamlines compounded into a uniform grey band along the wind direction, obscuring the basemap. Fixed by tightening the trail decay, reducing low-zoom particle density, and compensating visually with thicker per-stroke line width. z7 was used as the visual reference (no change to its appearance); the taper applies only at zooms below it.
@@ -530,7 +547,8 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
-[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-rc2...HEAD
+[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-rc3...HEAD
+[3.6.0-rc3]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-rc2...v3.6.0-rc3
 [3.6.0-rc2]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-rc1...v3.6.0-rc2
 [3.6.0-rc1]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-beta2...v3.6.0-rc1
 [3.6.0-beta2]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-beta1...v3.6.0-beta2
