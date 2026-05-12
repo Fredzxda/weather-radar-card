@@ -65,13 +65,15 @@ const TRAIL_LENGTH = 60;
 // ~20 sec ("ghost ribbons") and the constant per-pixel particle density
 // (which at z3 covers a continental area) painted the whole canvas in
 // uniform streaks. The slope is calibrated so f(z4) ≈ 0.23 (down ~30%
-// from a flat-1.0 baseline at low zoom) and f(z10) ≈ 1.08 (up ~30% at
-// high zoom — denser, more vibrant streaks at city level). Below LOW
-// returns LOW; above REFERENCE returns the high cap.
+// from a flat-1.0 baseline at low zoom) and plateaus at f(z8) = 0.80.
+// Above z8 the multiplier stays at HIGH_ZOOM_DETAIL_MULT — going further
+// (we used to ramp to 1.37 at z12) made high-zoom views over-painted vs
+// what z8 had been visually calibrated to. Below LOW returns LOW; above
+// REFERENCE returns the high cap.
 const LOW_ZOOM_DETAIL_MULT = 0.09;
-const HIGH_ZOOM_DETAIL_MULT = 1.37;
+const HIGH_ZOOM_DETAIL_MULT = 0.80;
 const LOW_DETAIL_ZOOM = 3;
-const REFERENCE_DETAIL_ZOOM = 12;
+const REFERENCE_DETAIL_ZOOM = 8;
 // Visual speed exaggeration, zoom-aware. The naive constant-pixel-speed
 // path made low zoom look much faster than high zoom: at z=4 a 10 m/s wind
 // raced across the continent each second; at z=12 it crawled. We compute
@@ -80,13 +82,16 @@ const REFERENCE_DETAIL_ZOOM = 12;
 //
 // Calibration: at zoom 8 / lat 50, pxPerMeter ≈ 0.00255 → 0.1 px/(m/s)/frame
 // puts a 10 m/s wind at ~3 px/sec there, which reads as gentle drift across
-// city-region zooms. Cap on top zoom keeps particles from flying off-screen
-// at street level. Floor keeps continental views perceptible — combined
-// with the streak-length compensation below, even floored speeds render
-// as visibly drifting ribbons.
+// city-region zooms. MAX is set to the z8 reference value — above z8 we
+// plateau pixel velocity, which means streak length (= TRAIL_LENGTH × velocity)
+// also plateaus, matching the corresponding density cap on _zoomDetailMultiplier.
+// Higher zooms still show finer wind detail (smaller bbox → finer grid samples)
+// but the streaks themselves stay calibrated to z8's "comfortable" length.
+// Floor keeps continental views perceptible — combined with the streak-length
+// compensation below, even floored speeds render as visibly drifting ribbons.
 const REFERENCE_PX_PER_M = 0.00255;
 const REFERENCE_PX_PER_MPS_PER_FRAME = 0.1;
-const MAX_PX_PER_MPS_PER_FRAME = 0.3;
+const MAX_PX_PER_MPS_PER_FRAME = 0.1;
 const MIN_PX_PER_MPS_PER_FRAME = 0.01;
 // Refresh anchored to the top of each clock hour. Our "current" time is
 // already hour-bucketed (Math.trunc(timeMs / 3_600_000)), so the displayed
