@@ -37,6 +37,21 @@ const NOAA_WMS_LAYER = 'radar_base_reflectivity_time';
 
 const DWD_WMS_URL = 'https://maps.dwd.de/geoserver/dwd/wms';
 const DWD_WMS_LAYER_DEFAULT = 'Niederschlagsradar';
+
+// Dedicated Leaflet pane for the radar tile layers. Sits between the
+// basemap (tilePane = 200) and the wind-flow canvas (wrcWindFlow = 250).
+// Two reasons to give the radar its own pane:
+//   1. Pane-level CSS opacity. radar_opacity is applied on the pane,
+//      letting individual layers crossfade between 0 and 1 (always opaque
+//      transitions). With the prior model — opacity set per-layer at
+//      radar_opacity — two semi-transparent layers stacked during a
+//      crossfade and the alpha-over composite brightened during the
+//      overlap, producing visible "shadow clouds" / flicker on every
+//      tick. Composite α is now constant at radar_opacity throughout.
+//   2. Future runtime layer-toggle UX gets a single `display: none`
+//      target instead of having to track every loaded radar layer.
+const RADAR_PANE_NAME = 'wrcRadar';
+const RADAR_PANE_Z_INDEX = 240;
 // Frames usually appear 1–3 min after their timestamp; 5 min is safely past the lag.
 const DWD_LAG_MS = 5 * 60 * 1000;
 
@@ -192,6 +207,7 @@ export class RadarPlayer {
   // (recoloured to theme variables). _showSlot snap-switches visibility
   // — never crossfades — so two stacked masks can't compound the dim.
   private _radarMask: (FetchWmsTileLayer | null)[] = [];
+  private _radarPaneCreated = false;
   private _dwdMaskPaneCreated = false;
   private _dwdDimRgba: [number, number, number, number] | null = null;
   private _dwdOutlineRgba: [number, number, number, number] | null = null;
@@ -317,6 +333,11 @@ export class RadarPlayer {
     const fade = this._cfg.transition_time ?? Math.floor(this._timeout * 0.4);
     return { fadeMs: fade, delayMs: fade };
   }
+  // Resolved radar_opacity, clamped to [0, 1] and normalised to a CSS
+  // opacity string. Applied at the radar pane level (see
+  // _ensureRadarPane) so every individual radar layer can crossfade
+  // between fully-transparent and fully-opaque without compounding the
+  // alpha of the layer underneath.
   private get _activeOpacity(): string {
     const v = this._cfg.radar_opacity;
     if (typeof v !== 'number' || !isFinite(v)) return '1';
@@ -461,19 +482,22 @@ export class RadarPlayer {
   }
 
   // Snap to a clean state where only _prev1Slot (the most-recently-
-  // shown frame) is visible at the user's radar_opacity. Used when
-  // pausing the loop so the user doesn't see the cushion `prev1` of
-  // the previous tick still at opacity 1 underneath the current.
+  // shown frame) is visible. Used when pausing the loop so the user
+  // doesn't see the cushion `prev1` of the previous tick still at
+  // opacity 1 underneath the current.
+  //
+  // Layer opacity is 0 or 1 — radar_opacity is applied at the pane
+  // level (see _ensureRadarPane), so individual layers always
+  // transition between fully transparent and fully opaque.
   private _settleVisibility(): void {
     const current = this._prev1Slot;
-    const active = this._activeOpacity;
     for (let s = 0; s < this._loadedSlots.length; s++) {
       const fi = this._loadedSlots[s];
       const layer = this._radarImage[fi];
       const el = layer && (layer as any).getContainer?.() as HTMLElement | undefined;
       if (!el) continue;
       el.style.transition = 'none';
-      el.style.opacity = (s === current) ? active : '0';
+      el.style.opacity = (s === current) ? '1' : '0';
     }
   }
 
@@ -527,15 +551,21 @@ export class RadarPlayer {
     const fade = timing.fadeMs;
     const fadeOutDelay = timing.delayMs;
     const transition = fade > 0 ? `opacity ${fade}ms ease-in-out` : 'none';
-    const active = this._activeOpacity;
 
-    // Two-slot animation model:
+    // Two-slot animation model. Per-layer opacity transitions between 0
+    // and 1; radar_opacity is applied at the pane level (see
+    // _ensureRadarPane). With opaque layers, the alpha-over composite
+    // during the overlap window stays at α=1 inside the pane — no
+    // brightness bump from two semi-transparent layers stacking, which
+    // was the cause of the "shadow clouds" / flicker seen at
+    // radar_opacity < 1 prior to the pane refactor.
+    //
     //   - `slot` (new): snaps to opacity 0 at the new highest z-index,
-    //     then fades 0 → active over `fade` ms.
+    //     then fades 0 → 1 over `fade` ms.
     //   - `prev1` (the previous current, captured below): kicks off a
     //     DELAYED fade-out — `transition-delay: fade` ms means it stays
-    //     at active for `fade` ms (covering transparent pixels of the
-    //     new layer during its fade-in), then fades 1 → 0 over `fade` ms.
+    //     at 1 for `fade` ms (covering transparent pixels of the new
+    //     layer during its fade-in), then fades 1 → 0 over `fade` ms.
     //   - Older slots: trusted to be already at 0 (or finishing their
     //     own delayed fade-out from a previous tick, which we don't
     //     interrupt — letting it complete keeps motion smooth even when
@@ -543,14 +573,15 @@ export class RadarPlayer {
     //
     // Cycle behaviour:
     //   - During the first `fade` ms of a tick: new fading in, prev1
-    //     held at active. Two visible layers (no alpha dip — z-stack).
+    //     held at 1. Two visible layers, but composite stays opaque
+    //     within the pane.
     //   - During the next `fade` ms: new fully on top, prev1 fading out.
     //     Two visible layers (one fading).
     //   - From `2*fade` ms until the next tick: only the new is visible.
     //     Single layer for `frame_delay - 2*fade` ms.
     //
     // When fade is 0 (animations off / snap mode), there's no transition
-    // to delay, so the chain logic collapses: snap new to active, snap
+    // to delay, so the chain logic collapses: snap new to 1, snap
     // all others to 0. Single layer always visible.
     this._zCounter++;
     const newZ = Z_RADAR_BASE + this._zCounter;
@@ -573,11 +604,11 @@ export class RadarPlayer {
         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         void el.offsetHeight;
         el.style.transition = transition;
-        el.style.opacity = active;
+        el.style.opacity = '1';
       } else if (useChain && s === prev1) {
         // Just-promoted previous current: delayed fade-out. The
         // `transition-delay` (the second time value) holds the layer
-        // at active opacity until the delay elapses, then begins the
+        // at opacity 1 until the delay elapses, then begins the
         // fade-out. In regular mode delay == fade duration so the
         // fade-out starts AT fade-in completion (sequential). In smooth
         // mode delay is 75% of fade duration — the fade-out starts
@@ -785,6 +816,24 @@ export class RadarPlayer {
     this._dwdMaskPaneCreated = true;
   }
 
+  // Pane for radar tile layers. The pane's CSS opacity carries
+  // radar_opacity, so the per-layer crossfade can transition between 0
+  // and 1 (always opaque) without producing the alpha-over composite
+  // brightness bump that two semi-transparent stacked layers cause.
+  // Idempotent — safe to call from _initRadar on every re-init; opacity
+  // is re-applied in case radar_opacity changed in the new config.
+  private _ensureRadarPane(): void {
+    if (!this._map) return;
+    let pane = this._map.getPane(RADAR_PANE_NAME);
+    if (!pane) {
+      pane = this._map.createPane(RADAR_PANE_NAME);
+      pane.style.zIndex = String(RADAR_PANE_Z_INDEX);
+      pane.style.pointerEvents = 'none';
+      this._radarPaneCreated = true;
+    }
+    pane.style.opacity = this._activeOpacity;
+  }
+
   // Cache the theme colours per init so 48 frames don't each call
   // getComputedStyle.
   private _refreshDwdMaskColors(): void {
@@ -943,6 +992,7 @@ export class RadarPlayer {
         rateLimiter: this._noaaLimiter,
         on429: () => this._onRateLimited(),
         animationOwnsOpacity: true,
+        pane: RADAR_PANE_NAME,
       } as any));
     }
     if (dataSource === 'DWD') {
@@ -965,6 +1015,7 @@ export class RadarPlayer {
         on429: () => this._onRateLimited(),
         animationOwnsOpacity: true,
         pixelFilter: makeDwdMaskFilter(layerName),
+        pane: RADAR_PANE_NAME,
       } as any));
     }
     const snow = this._cfg.show_snow ? 1 : 0;
@@ -982,6 +1033,7 @@ export class RadarPlayer {
       rateLimiter: this._rainviewerLimiter,
       on429: () => this._onRateLimited(),
       animationOwnsOpacity: true,
+      pane: RADAR_PANE_NAME,
     } as any));
   }
 
@@ -1011,6 +1063,11 @@ export class RadarPlayer {
     const myGen = this._frameGeneration;
     this._loadedSlots = [];
     this._currentSlot = 0;
+
+    // Make sure the dedicated radar pane exists and reflects the current
+    // radar_opacity. Layer constructors below pass `pane: RADAR_PANE_NAME`
+    // so each tile layer's container is appended into this pane.
+    this._ensureRadarPane();
 
     let pastFrames: RadarFrame[];
     try {
@@ -1069,9 +1126,11 @@ export class RadarPlayer {
         this._loadedSlots.unshift(fi);
 
         if (!newestShown) {
-          // Show newest frame as a static preview before the loop starts
+          // Show newest frame as a static preview before the loop starts.
+          // Layer opacity is 1 — radar_opacity is carried by the radar
+          // pane (see _ensureRadarPane).
           newestShown = true;
-          if (el) el.style.opacity = this._activeOpacity;
+          if (el) el.style.opacity = '1';
           // Surface the matching mask too, so the preview already has
           // its in-sync coverage overlay before the loop begins.
           const maskEl = layerEl(this._radarMask[fi]);
