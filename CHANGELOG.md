@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Shadow clouds / flicker at `radar_opacity < 1`** ([#151](https://github.com/Makin-Things/weather-radar-card/issues/151)). With per-layer opacity set to `radar_opacity`, two semi-transparent radar layers stacked during the crossfade and the alpha-over composite brightened during the overlap window — visible as "shadow clouds" (rain from both frames showing through where they didn't perfectly align) and as a flicker on every animation tick. Fix moves all radar tile layers into a dedicated `wrcRadar` Leaflet pane (z-index 240, between basemap and wind-flow) and applies `radar_opacity` on the pane. Individual layers now crossfade between 0 and 1, so the composite α inside the pane stays at 1 throughout the overlap; the pane multiplies the whole composite by `radar_opacity` once. DWD coverage mask layer unaffected — already on its own pane, snap-switched, controlled by separate CSS theme vars.
+
 ## [3.6.0] - 2026-05-12
 
 > **DWD wind overlay**: barbs, arrows, and animated streamlines sampled from the same ICON-D2 10 m wind layer DWD's WarnWetter app uses. Available regardless of `data_source` (the model is global). Also: bulk WCS fetch architecture (60–290× fewer HTTP requests per refresh vs. the alpha line), edit-mode regression fix, dateline wrap, and a long tuning pass on the streamline visuals.
