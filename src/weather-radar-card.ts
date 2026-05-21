@@ -19,8 +19,27 @@ import { FetchTileLayer } from './fetch-tile-layer';
 import { WindOverlay } from './wind-overlay';
 import { defaultWindSourceForLocation, DEFAULT_WIND_SOURCE } from './wind-source-caps';
 import { WindFlowOverlay } from './wind-flow-overlay';
-import { RadarToolbar } from './radar-toolbar';
+import { RadarToolbar, SPEED_STEPS } from './radar-toolbar';
 import { RadarPlayer } from './radar-player';
+
+// localStorage key for the toolbar's playback-speed multiplier. Shared
+// across every weather-radar-card on the page so a user-set speed
+// preference applies wherever the card is embedded. Validated and
+// clamped on read; corrupt or out-of-range values fall back to 1×.
+const PLAYBACK_SPEED_KEY = 'wrc-playback-speed';
+
+function parsePlaybackSpeed(raw: string | null): number {
+  if (raw == null) return 1;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  // Clamp to the SPEED_STEPS range; values outside it indicate a stale
+  // entry from a version with different presets.
+  const lo = SPEED_STEPS[0];
+  const hi = SPEED_STEPS[SPEED_STEPS.length - 1];
+  if (n < lo) return lo;
+  if (n > hi) return hi;
+  return n;
+}
 import {
   isMobileDevice,
   getCurrentUserInfo,
@@ -940,6 +959,14 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     const showRecenter = cfg.show_recenter === true && cfg.static_map !== true;
     const showPlayback = cfg.show_playback === true;
     if (!showRecenter && !showPlayback) return;
+    // Restore the user's previous playback speed (if any) before the
+    // toolbar mounts so the button label and the player's effective
+    // frame_delay both start coherent. Single-key localStorage entry
+    // shared across all cards on the page — a per-card key is overkill
+    // for a UI preference that's expected to be the same everywhere.
+    const savedSpeed = parsePlaybackSpeed(localStorage.getItem(PLAYBACK_SPEED_KEY));
+    this._player?.setSpeedMultiplier(savedSpeed);
+
     this._toolbar = new RadarToolbar({
       showRecenter,
       showPlayback,
@@ -947,6 +974,16 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
       onPlay: () => this._player?.togglePlay(),
       onSkipBack: () => this._player?.skipBack(),
       onSkipNext: () => this._player?.skipNext(),
+      initialSpeed: savedSpeed,
+      onSpeedChange: (m) => {
+        this._player?.setSpeedMultiplier(m);
+        try {
+          localStorage.setItem(PLAYBACK_SPEED_KEY, String(m));
+        } catch {
+          // Quota or privacy-mode block — speed still works for this
+          // session, it just won't persist across reloads.
+        }
+      },
     });
     this._toolbar.addTo(this._map);
   }
