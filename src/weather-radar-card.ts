@@ -224,6 +224,20 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     }
     const oldConfig = this._config;
     this._config = this._migrateConfig(config);
+    // If the user just changed playback_speed in the editor, clear the
+    // localStorage override left over from a previous toolbar button
+    // click. Without this the resolver would keep returning the old
+    // button-click value and the editor change would silently no-op —
+    // which is exactly what the editor feels broken from a user's
+    // perspective.
+    if (oldConfig && oldConfig.playback_speed !== this._config.playback_speed) {
+      try { localStorage.removeItem(PLAYBACK_SPEED_KEY); } catch {
+        // Privacy mode or quota — fine, the new config still takes
+        // effect because the teardown + rebuild below re-runs the
+        // resolver and localStorage was the only thing it would have
+        // preferred over config.
+      }
+    }
     // Any structural change → full reset. Stale CSS-transition state on
     // radar layers from the previous animation regime is the cleanest to
     // wipe by destroying the map and rebuilding. The exception is the
