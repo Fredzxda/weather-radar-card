@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to Weather Radar Card! This document provides guidelines for contributing to the project.
 
+> **AI coding agents** (Claude Code, Copilot, Cursor, etc.): the canonical contribution rules — authority, hard no's, the diagnostic discipline, pre-commit gates, doc obligations — live in [AGENTS.md](AGENTS.md). Read it before making any change. This file remains the human-facing onboarding guide; the two should not contradict.
+
 ## Development Setup
 
 ### Prerequisites
