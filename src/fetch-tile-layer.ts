@@ -68,11 +68,16 @@ interface Coords extends L.Point {
 // On a busy mobile connection this cuts wire bandwidth substantially:
 // a low-zoom continental pan can trigger dozens of tile fetches that
 // would otherwise complete after the user has already moved past them.
-interface TileWithAbort extends HTMLImageElement {
+//
+// Exported (with TileWithAbort) so the abort-integration tests can
+// exercise wireAbortLifecycle and createFetchTile against minimal layer
+// stubs without needing a full L.TileLayer instance.
+export interface TileWithAbort extends HTMLImageElement {
   __wrcAbort?: AbortController | null;
 }
 
-function createFetchTile(
+/** @internal — exported for tests/fetch-abort.test.ts integration coverage. */
+export function createFetchTile(
   this: FetchTileLayer | FetchWmsTileLayer,
   coords: Coords,
   done: L.DoneCallback,
@@ -170,7 +175,9 @@ function createFetchTile(
 // Hook Leaflet's tileunload event so we abort the underlying fetch when
 // a tile leaves the DOM. Also hook the layer's `remove` event for the
 // bulk teardown case (layer removed from the map, card teardown).
-function wireAbortLifecycle(layer: FetchTileLayer | FetchWmsTileLayer): void {
+//
+// @internal — exported for tests/fetch-abort.test.ts integration coverage.
+export function wireAbortLifecycle(layer: FetchTileLayer | FetchWmsTileLayer): void {
   layer.on('tileunload', (e: L.TileEvent) => {
     const tile = e.tile as TileWithAbort;
     tile.__wrcAbort?.abort();
