@@ -1083,27 +1083,38 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     document.addEventListener('visibilitychange', this._visibilityHandler);
   }
 
+  // ⚠️  Do not "simplify" by removing the requestAnimationFrame defer or
+  // the try/catch. Both compensate for a framework limitation in
+  // leaflet.markercluster that we cannot fix from this side:
+  //
+  //   Markercluster initialises its internal cluster tree
+  //   (`_topClusterLevel._bounds`) lazily, on the first event tick that
+  //   needs bounds — there is NO public lifecycle hook to wait for "tree
+  //   ready." Our ResizeObserver can fire BEFORE that first event tick,
+  //   in which case calling map.invalidateSize() drives markercluster's
+  //   resize handler into reading the undefined `_bounds` and throwing
+  //   "Cannot read properties of undefined (reading 'lat')".
+  //
+  // The rAF defer gives the cluster tree's lazy init time to complete
+  // (it's a microtask, so it lands before the next paint). The try/catch
+  // is belt-and-braces for the rare case where the cluster tree is even
+  // slower to settle than one rAF — the observer will fire again on the
+  // next resize tick and re-attempt cleanly.
+  //
+  // Issue #110 is the original instance of the same root cause on the
+  // zoomEnd path; this method handles the resize path. If a future
+  // markercluster release adds a proper "ready" event, this method
+  // becomes a candidate for simplification — until then, leave the
+  // timing dance intact.
   private _setupResizeObserver(): void {
     const mapEl = this.shadowRoot?.getElementById('mapid');
     if (!mapEl) return;
     this._resizeObserver = new ResizeObserver(() => {
-      // Defer to next frame so any pending markercluster initialization
-      // microtasks (esp. the first bounds computation) complete before
-      // we fire 'resize' via invalidateSize. Without this defer, the
-      // ResizeObserver's first callback can race the cluster group's
-      // setup — markercluster's resize handler tries to read
-      // _topClusterLevel._bounds while it's still undefined and crashes
-      // with "Cannot read properties of undefined (reading 'lat')".
-      // See issue #110 for the original instance of the same race
-      // (zoomEnd path); this is the resize path of the same root cause.
       requestAnimationFrame(() => {
         if (!this._map) return;
         try {
           this._map.invalidateSize();
         } catch (e) {
-          // Belt-and-braces: if markercluster still trips on this in
-          // some edge case, log instead of breaking the whole card.
-          // The next ResizeObserver tick will re-attempt.
           console.warn('[weather-radar-card] invalidateSize() raised — likely the markercluster init race. Recovering on next resize.', e);
         }
       });
