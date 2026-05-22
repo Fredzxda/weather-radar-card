@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-05-22
+
+> Patch release: bandwidth optimisation for mobile users (`AbortController` on tile + data fetches), cleanup of phantom dependencies, and a doc-block above the markercluster race workaround. **No new features, no behaviour changes for existing configs.** The 3.6.1 wind-source registry stays Experimental.
+
+### Changed
+
+- **`AbortController` on tile + data fetches** ([#159](https://github.com/Makin-Things/weather-radar-card/pull/159)). Radar tiles, wildfire perimeter fetches, NWS alerts (+ per-zone shape fetches), and the RainViewer JSON metadata call now cancel their HTTP requests when superseded by a fresh fetch, when the card tears down, or when Leaflet unloads the tile (pan-out-of-view / zoom). Previously the generation-counter trick discarded stale **responses** but the browser still downloaded the full payload first. On mobile or rate-limited connections a low-zoom continental pan can trigger dozens of tile requests that immediately get superseded — those now show as `(canceled)` in DevTools Network instead of completing. Steady-state playback is unchanged (tiles recycle across frames without unloading → no abort, correct). `src/wind-grid-fetcher.ts` intentionally not instrumented (its request-coalescing makes correct cancellation tricky; the 60 s cache TTL already provides similar bandwidth conservation — revisit when 3.7's layer-control panel adds explicit per-card cancellation).
+
+### Internal
+
+- **Phantom dependencies removed**. `randombytes`, `safe-buffer`, `tslib`, `tsutils` were listed in `dependencies` but not imported anywhere in `src/`, `tests/`, or the rollup config. `tslib` correctly stays as a transitive (via `custom-card-helpers` and `rollup-plugin-typescript2`); the other three drop from `node_modules` entirely. Companion to the `serialize-javascript` security bump that landed in 3.6.1.
+- **Markercluster init-race workaround documented**. The `requestAnimationFrame` + try/catch in `_setupResizeObserver` now carries a doc-block explicitly warning future contributors not to "simplify" it. The pattern works around a framework limitation in `leaflet.markercluster` (no lifecycle hook for "cluster tree ready"); replacing it with a synchronous call re-triggers the `_topClusterLevel._bounds` undefined crash from #110 on the resize path.
+- **Tests**: 440 → 455. New `tests/fetch-abort.test.ts` pins the `AbortController` / `AbortSignal` contract our error-handler branches depend on, the abort-previous-on-supersession pattern, and `wireAbortLifecycle` + `createFetchTile` integration via minimal layer stubs (consistent with the project's "stub Leaflet, test the helpers" convention).
+
+Three deferred items from the [code review](docs/code-review.md) pass are tracked in [docs/todo.md](docs/todo.md): TypeScript module augmentation for Leaflet (3.8 health pass), Web Worker for the DWD pixel filter (only after profiling shows main-thread spikes), and `WindGridFetcher` cancellation via consumer reference-counting (pair with 3.7 layer-control).
+
 ## [3.6.1] - 2026-05-21
 
 > Two stable bug fixes (radar opacity #151, ghost trails on initial load #155), a build-time security bump for `serialize-javascript`, and an **experimental** wind-source registry that adds NDFD over US regions and AICON globally. Promoted from [3.6.1-rc1] (2026-05-16) after a short bake — the wind work keeps its **Experimental** tag for one more release while we gather feedback at viewport boundaries and unusual locales.
@@ -635,7 +651,8 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
-[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.1...HEAD
+[Unreleased]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.2...HEAD
+[3.6.2]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.1...v3.6.2
 [3.6.1]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.1-rc1...v3.6.1
 [3.6.1-rc1]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0...v3.6.1-rc1
 [3.6.0]: https://github.com/Makin-Things/weather-radar-card/compare/v3.6.0-rc4...v3.6.0
