@@ -316,6 +316,15 @@ tutorial implies, grep the installed
 between releases and example code from other projects sometimes
 references APIs that no longer exist.
 
+For the specific case of `<ha-*>` Web Components in this card —
+when to use which one, how the lazy-load timing window bites, the
+empirical status of each element we've verified, the design tokens
+to target when rolling your own — see
+[`docs/ha-elements-guide.md`](docs/ha-elements-guide.md). That doc
+captures the lessons learned from real incidents (most recently the
+`ha-textfield` → `ha-input` migration that shipped in 3.6.3 after
+the editor's input fields went invisible on current HA).
+
 ## Documentation obligations
 
 When a change touches user-visible behavior or future plans,
