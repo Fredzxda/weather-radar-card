@@ -22,7 +22,7 @@ Claude-specific supplement, not override.
 - The **diagnostic discipline** in [`AGENTS.md`](AGENTS.md) ("no
   fixes without understanding") is load-bearing. It exists because
   the rule was learned from real incidents in this codebase — the
-  `leaflet.markercluster` init race ([#110](https://github.com/Makin-Things/weather-radar-card/issues/110))
+  `leaflet.markercluster` init race ([#110](https://github.com/jpettitt/weather-radar-card/issues/110))
   is the canonical example. Treat it as a hard constraint, not
   advisory.
 - `master` is the canonical working branch; `main` is mirrored by

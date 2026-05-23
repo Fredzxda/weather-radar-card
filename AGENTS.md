@@ -287,7 +287,7 @@ card's `ResizeObserver` can fire *before* that first tick, in which
 case calling `map.invalidateSize()` drives markercluster into
 reading the undefined `_bounds` and throwing
 `Cannot read properties of undefined (reading 'lat')` — issue
-[#110](https://github.com/Makin-Things/weather-radar-card/issues/110),
+[#110](https://github.com/jpettitt/weather-radar-card/issues/110),
 fixed in commit `c33a4a3`.
 
 The fix is a `requestAnimationFrame` defer plus a `try/catch`. The
