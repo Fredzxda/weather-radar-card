@@ -176,4 +176,27 @@ export interface WeatherRadarCardConfig extends LovelaceCardConfig {
     rows?: number | 'auto';
     columns?: number | 'full';
   };
+
+  // ── Per-user viewer state (3.7+) ─────────────────────────────────────────
+  // See docs/viewer-state-api.md. Dormant by default — no behaviour change
+  // unless a feature consumer opts the card in via `viewer_layer_control`.
+
+  /**
+   * Admin opt-in for per-user, per-card state (overlay visibility, playback
+   * preferences, etc.) persisted via HA's frontend storage WebSocket API.
+   * When false / unset, no identity is minted and no WS calls fire.
+   * When true, the card auto-mints `_layer_state_id` on the next setConfig.
+   */
+  viewer_layer_control?: boolean;
+
+  /**
+   * Auto-managed by the card. Stable identity used as the per-card storage
+   * key for viewer state. Minted automatically when `viewer_layer_control`
+   * is on; re-minted on dashboard-path mismatch or within-dashboard
+   * copy-paste collision. **Users should not edit this by hand.**
+   */
+  _layer_state_id?: {
+    dash: string;
+    nonce: string;
+  };
 }
