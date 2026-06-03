@@ -1,6 +1,6 @@
 # Lightning overlay — design
 
-Live lightning-strike overlay sourced from the user's existing [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) in Home Assistant. No external HTTP from the card — strikes are already in `hass.states` as `geo_location` entities, and the integration handles all polling, distance filtering, and age-capping. The card just renders.
+Live lightning-strike overlay sourced from the user's existing [Blitzortung integration](https://github.com/mrk-its/homeassistant-blitzortung) in Home Assistant. No external HTTP from the card — strikes are already in `hass.states` as `geo_location` entities, and the integration handles all polling, distance filtering, and age-capping. The card just renders.
 
 ## Status — shipped in v3.6.0-alpha
 
@@ -63,7 +63,7 @@ function isBlitzortungLoaded(hass: HomeAssistant): boolean {
 
 The **Show Lightning** toggle on the Hazard Overlays subpage is rendered always but disabled + dimmed when `isBlitzortungLoaded` is false, with a tooltip:
 
-> *Requires the [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) — install it in HA first.*
+> *Requires the [Blitzortung integration](https://github.com/mrk-its/homeassistant-blitzortung) — install it in HA first.*
 
 Same pattern as `square_map`'s disabled-when-height-pinned UX. Discoverable, honest about why.
 
