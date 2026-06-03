@@ -26,7 +26,7 @@ For the full release history see [CHANGELOG](https://github.com/jpettitt/weather
 
 ## Roadmap
 
-- **Real-time lightning strikes** when the [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) is installed — shipped in 3.6.0
+- **Real-time lightning strikes** when the [Blitzortung integration](https://github.com/mrk-its/homeassistant-blitzortung) is installed — shipped in 3.6.0
 - **Wind overlay** — barbs, arrows, animated streamlines from DWD's ICON-D2 model (global 0.25° grid). Shipped in 3.6.0-beta. See [Hazard & Layer Overlays](https://github.com/jpettitt/weather-radar-card/blob/main/docs/overlays.md#wind).
 - **Wind source choice** (AICON / BRD-1km / NOAA NCSS) — target 3.7. See [todo.md](https://github.com/jpettitt/weather-radar-card/blob/main/docs/todo.md).
 - **Per-user / per-card layer visibility control** — target 3.7

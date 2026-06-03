@@ -73,7 +73,7 @@ Both polygon-bearing alerts (most warnings) and zone-based alerts (most advisori
 
 ## Lightning (Blitzortung)
 
-When `show_lightning: true` *and* the [Blitzortung integration](https://www.home-assistant.io/integrations/blitzortung/) is loaded in Home Assistant, the card overlays live lightning strikes from the integration's `geo_location.lightning_strike_*` entities. No external HTTP from the card — the integration handles all the data plumbing (WebSocket polling, distance filtering, age-capping); the card just renders.
+When `show_lightning: true` *and* the [Blitzortung integration](https://github.com/mrk-its/homeassistant-blitzortung) is loaded in Home Assistant, the card overlays live lightning strikes from the integration's `geo_location.lightning_strike_*` entities. No external HTTP from the card — the integration handles all the data plumbing (WebSocket polling, distance filtering, age-capping); the card just renders.
 
 Each strike appears as a brief flash with a lightning-bolt icon (the "happening now!" indicator), and after 30 s settles into a coloured **+** sign. The + sign's fill colour ages through Blitzortung's web-map gradient: white → yellow → orange → coral → red → dark red, mirroring the visual language users coming from [their map](https://map.blitzortung.org/) already know. Newer strikes always paint on top of older ones.
 
