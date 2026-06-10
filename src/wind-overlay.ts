@@ -89,9 +89,36 @@ export class WindOverlay {
     this._gen++;
   }
 
+  // ── Visibility pause ──────────────────────────────────────────────────
+  //
+  // Driven by the host card's onHide/onShow (IntersectionObserver +
+  // visibilitychange) — the same roster that pauses the radar player and
+  // the hazard overlays. Without this, the self-rescheduling hourly
+  // refresh kept fetching the wind grid while the card was hidden.
+
+  private _paused = false;
+
+  pause(): void {
+    if (this._paused) return;
+    this._paused = true;
+    if (this._refreshTimer) { clearTimeout(this._refreshTimer); this._refreshTimer = null; }
+    if (this._debounceTimer) { clearTimeout(this._debounceTimer); this._debounceTimer = null; }
+  }
+
+  resume(): void {
+    if (!this._paused) return;
+    this._paused = false;
+    // The hour bucket may have rolled over while hidden — refresh
+    // immediately rather than waiting for the next boundary, then
+    // re-arm the hourly chain.
+    this._scheduleHourlyRefresh();
+    void this._refresh();
+  }
+
   // Self-rescheduling timer that wakes shortly after each clock hour to
   // pick up the new hour bucket / model run. Independent of map events.
   private _scheduleHourlyRefresh(): void {
+    if (this._paused) return;
     const now = Date.now();
     const nextHour = Math.ceil(now / 3_600_000) * 3_600_000;
     const delay = nextHour - now + HOURLY_REFRESH_OFFSET_MS;

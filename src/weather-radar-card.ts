@@ -310,10 +310,37 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
       return;
     }
     if (this._map) {
-      this._teardown();
-      this._initMap();
+      this._scheduleRebuild();
     }
     this._viewerState?.ensureIdentity();
+  }
+
+  // Debounced full rebuild for structural config changes. The editor's
+  // text fields fire `config-changed` on every keystroke, and each one
+  // round-trips through Lovelace back into setConfig — typing "37.7749"
+  // into the latitude field used to mean SEVEN full Leaflet teardowns +
+  // marker/overlay rebuilds + radar frame/tile refetches (which also
+  // burn the shared rate-limiter window). Coalescing the rebuild behind
+  // a short trailing debounce means the map rebuilds once, ~250 ms
+  // after the last keystroke, against the latest config (`_config` is
+  // always assigned synchronously above — only the visual rebuild is
+  // deferred). For a single deliberate change (editor toggle, YAML
+  // save) the added latency is one debounce window, imperceptible
+  // against the rebuild itself.
+  private _rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private _scheduleRebuild(): void {
+    if (this._rebuildTimer) clearTimeout(this._rebuildTimer);
+    this._rebuildTimer = setTimeout(() => {
+      this._rebuildTimer = null;
+      // Card may have been disconnected while the debounce was
+      // pending — disconnectedCallback already tore the map down and
+      // cancelled this timer, but belt-and-braces: never rebuild a
+      // detached card.
+      if (!this.isConnected) return;
+      if (this._map) this._teardown();
+      this._initMap();
+    }, 250);
   }
 
   // Create the per-card preference store if it doesn't exist yet and
@@ -532,6 +559,9 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
+    // Cancel any pending debounced rebuild — rebuilding a detached card
+    // would leak a fresh Leaflet map with no DOM to live in.
+    if (this._rebuildTimer) { clearTimeout(this._rebuildTimer); this._rebuildTimer = null; }
     if (this._editorOpenedHandler) window.removeEventListener('weather-radar-editor-opened', this._editorOpenedHandler);
     if (this._editorClosedHandler) window.removeEventListener('weather-radar-editor-closed', this._editorClosedHandler);
     this._editorOpenedHandler = null;
@@ -1281,12 +1311,21 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
       this._wildfireLayer?.pause();
       this._alertsLayer?.pause();
       this._lightningLayer?.pause();
+      // Wind overlays were missing from this roster — and it matters
+      // most for the streamline canvas: requestAnimationFrame is only
+      // throttled when the TAB is hidden, not when the card is merely
+      // scrolled off-screen, so the 15 fps particle loop used to keep
+      // running at full rate into an invisible canvas indefinitely.
+      this._windOverlay?.pause();
+      this._windFlow?.pause();
     };
     const onShow = (): void => {
       this._player?.onVisibilityVisible();
       this._wildfireLayer?.resume();
       this._alertsLayer?.resume();
       this._lightningLayer?.resume();
+      this._windOverlay?.resume();
+      this._windFlow?.resume();
     };
     this._visObserver = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) onShow();

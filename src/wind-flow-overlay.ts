@@ -231,6 +231,7 @@ export class WindFlowOverlay {
   // Self-rescheduling timer that wakes shortly after each clock hour to
   // pick up the new hour bucket / model run. Independent of map events.
   private _scheduleHourlyRefresh(): void {
+    if (this._paused) return;
     const now = Date.now();
     const nextHour = Math.ceil(now / 3_600_000) * 3_600_000;
     const delay = nextHour - now + HOURLY_REFRESH_OFFSET_MS;
@@ -238,6 +239,36 @@ export class WindFlowOverlay {
       void this._restart();
       this._scheduleHourlyRefresh();
     }, delay);
+  }
+
+  // ── Visibility pause ──────────────────────────────────────────────────
+  //
+  // Driven by the host card's onHide/onShow — the same roster that pauses
+  // the radar player and the hazard overlays. This matters MORE here than
+  // for the polling layers: requestAnimationFrame is only throttled by
+  // the browser when the TAB is hidden, not when the element is scrolled
+  // off-screen. Without an explicit pause, a card scrolled away on a long
+  // dashboard kept the full 15 fps particle loop running indefinitely —
+  // a full-canvas clear plus up to ~3500 particle advances and ~60
+  // batched strokes per frame, drawn into an invisible canvas.
+
+  private _paused = false;
+
+  pause(): void {
+    if (this._paused) return;
+    this._paused = true;
+    this._stopLoop();
+    if (this._refreshTimer) { clearTimeout(this._refreshTimer); this._refreshTimer = null; }
+  }
+
+  resume(): void {
+    if (!this._paused) return;
+    this._paused = false;
+    // Hour bucket may have rolled while hidden — _restart refetches the
+    // grid when the cached one expired, so a plain restart covers both
+    // "resume animation" and "pick up the new model run".
+    this._scheduleHourlyRefresh();
+    void this._restart();
   }
 
   destroy(): void {
@@ -262,6 +293,10 @@ export class WindFlowOverlay {
   }
 
   private async _restart(): Promise<void> {
+    // Paused (card hidden) — map events like resize can still fire while
+    // hidden; don't let them reanimate an invisible canvas. resume()
+    // calls _restart explicitly after clearing the flag.
+    if (this._paused) return;
     this._stopLoop();
     const myGen = ++this._gen;
     // Throttle bookkeeping reset — first frame after restart uses the

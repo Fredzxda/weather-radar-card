@@ -182,7 +182,15 @@ export class WildfireLayer {
     if (myGen !== this._gen) return;   // stale — abandon
     if (this._abortCtrl === ctrl) this._abortCtrl = null;
 
-    this._features = this._filter(features);
+    // null = the WFIGS fetch failed (transient 503 / rate-limit). Keep
+    // the currently displayed perimeters rather than blanking every
+    // fire polygon/icon for the 5-30 min until the next scheduled
+    // retry. Same convention _fetchInciwebSlugs already uses. A
+    // SUCCESSFUL fetch returning [] is real data ("no active fires in
+    // the feed") and replaces as before.
+    if (features !== null) {
+      this._features = this._filter(features);
+    }
     if (inciwebSlugs) {
       this._inciwebSlugs = inciwebSlugs;
       this._inciwebReady = true;
@@ -191,7 +199,10 @@ export class WildfireLayer {
     this._scheduleNext();
   }
 
-  private async _fetchWfigs(signal: AbortSignal): Promise<GeoJSON.Feature[]> {
+  // Returns null on failure so the caller can keep the existing feature
+  // set in place (avoid blowing displayed perimeters away on a transient
+  // error) — mirroring _fetchInciwebSlugs.
+  private async _fetchWfigs(signal: AbortSignal): Promise<GeoJSON.Feature[] | null> {
     try {
       const res = await fetch(NIFC_URL, { signal });
       if (!res.ok) throw new Error(`NIFC fetch ${res.status}`);
@@ -200,11 +211,11 @@ export class WildfireLayer {
     } catch (err) {
       // Deliberate cancellation (teardown / superseded by a fresh fetch).
       // Not a real failure — caller's gen check will discard the result anyway.
-      if ((err as Error)?.name === 'AbortError') return [];
+      if ((err as Error)?.name === 'AbortError') return null;
       // Transient — NIFC's ArcGIS endpoint occasionally rate-limits or
       // returns 503. Next scheduled fetch will retry.
       console.warn('Wildfire layer: WFIGS fetch failed', err);
-      return [];
+      return null;
     }
   }
 
@@ -364,6 +375,14 @@ export class WildfireLayer {
   }
 
   private _scheduleNext(): void {
+    // Paused → don't re-arm. pause() only cancels the ARMED timer; a
+    // fetch that was already in flight when pause() ran completes and
+    // its tail calls _scheduleNext — without this guard that re-armed
+    // the chain and the layer kept polling NIFC at full cadence for as
+    // long as the card stayed hidden. resume() decides between an
+    // immediate refetch and a reschedule, so dropping the re-arm here
+    // is safe.
+    if (this._pausedAt != null) return;
     if (this._timer) clearTimeout(this._timer);
     const cfg = this._getConfig();
     const overrideMin = cfg.wildfire_refresh_minutes;

@@ -472,6 +472,15 @@ export class NwsAlertsLayer {
   }
 
   private _scheduleNext(): void {
+    // Paused → don't re-arm. pause() only cancels the ARMED timer; a
+    // fetch that was already in flight when pause() ran (the 60 s
+    // alerts cadence makes that window frequent) completes and its
+    // tail calls _scheduleNext — without this guard that re-armed the
+    // chain and the layer kept polling api.weather.gov at full cadence
+    // for as long as the card stayed hidden. resume() decides between
+    // an immediate refetch and a reschedule, so dropping the re-arm
+    // here is safe.
+    if (this._pausedAt != null) return;
     if (this._timer) clearTimeout(this._timer);
     const cfg = this._getConfig();
     const overrideSec = cfg.alerts_refresh_seconds;
