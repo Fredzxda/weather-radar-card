@@ -239,8 +239,25 @@ export class RadarPlayer {
   // aborting just stops the wire bandwidth too. Only used by the
   // RainViewer path; DWD / NOAA derive frame timestamps locally.
   private _pathsAbortCtrl: AbortController | null = null;
+  // Displayed frame count. Starts as the caller's request but is
+  // re-derived from reality as frames arrive: _initRadar sets it to the
+  // number of frames the API actually returned, and _dedupFrames shrinks
+  // it when duplicate frames are pruned from the loop.
   private _configFrameCount = 5;
+  // The frame count the CARD asked for (from getEffectiveTimeRange).
+  // Kept separately because onNavSettled's "did frame_count change?"
+  // comparison must run against what was REQUESTED, not what's
+  // displayed — _configFrameCount legitimately diverges from the
+  // request (API returned fewer frames; dedup pruned duplicates), and
+  // comparing the nav callback's requested count against the displayed
+  // count made every pan/zoom take the full teardown + refetch branch
+  // forever once they diverged.
+  private _requestedFrameCount = 5;
   private _doRadarUpdate = false;
+  // Cancel function for the currently armed periodic-update timer.
+  // _scheduleUpdate maintains a single-chain invariant by cancelling
+  // this before arming a replacement; clear() cancels it on teardown.
+  private _cancelScheduledUpdate: (() => void) | null = null;
   // Wall-clock ms of the last time we fetched fresh frame paths
   // (either via _initRadar or _updateRadar). Read by onVisibilityVisible
   // to decide whether resuming from a hidden state needs a full
@@ -960,6 +977,7 @@ export class RadarPlayer {
 
   /** Start loading radar frames for the current map view. */
   async start(frameCount: number): Promise<void> {
+    this._requestedFrameCount = frameCount;
     this._configFrameCount = frameCount;
     await this._initRadar();
   }
@@ -974,6 +992,12 @@ export class RadarPlayer {
     this._map?.off('moveend', this._onMoveEnd);
     this._map?.off('resize', this._onResize);
     if (this._rateLimitTimer) { clearTimeout(this._rateLimitTimer); this._rateLimitTimer = null; }
+    // Cancel the armed periodic-update timer before terminating the
+    // worker — for the setTimeout-fallback path the worker teardown
+    // wouldn't kill it, and a post-clear() fire would act on a player
+    // the card has already discarded.
+    this._cancelScheduledUpdate?.();
+    this._cancelScheduledUpdate = null;
     this._worker?.terminate();
     this._worker = null;
     this._workerCallbacks.clear();
@@ -1000,11 +1024,18 @@ export class RadarPlayer {
     this.navPaused = false;
 
     // Full re-init only when state needs rebuilding: initial load not yet
-    // complete, or frame_count changed. Pan, zoom, and programmatic view
-    // changes leave layers attached — Leaflet fetches only the tiles
-    // entering the new viewport.
-    if (!this._radarReady || this._configFrameCount !== frameCount) {
+    // complete, or the REQUESTED frame_count changed (i.e. the user edited
+    // past_minutes / stride / source). Compared against
+    // _requestedFrameCount, not _configFrameCount — the displayed count
+    // legitimately diverges from the request (API returned fewer frames
+    // than asked; _dedupFrames pruned duplicates), and comparing against
+    // the displayed count made every pan/zoom take this full
+    // teardown + refetch branch forever once they diverged. Pan, zoom,
+    // and programmatic view changes leave layers attached — Leaflet
+    // fetches only the tiles entering the new viewport.
+    if (!this._radarReady || this._requestedFrameCount !== frameCount) {
       this._clearLayers();
+      this._requestedFrameCount = frameCount;
       this._configFrameCount = frameCount;
       await this._initRadar();
       return;
@@ -2000,10 +2031,24 @@ export class RadarPlayer {
   // ── Periodic update ──────────────────────────────────────────────────────
 
   private _scheduleUpdate(): void {
+    // Single-chain invariant: exactly one armed update timer at any
+    // time. Several paths can arm a fresh chain while an old timer is
+    // still pending (rate-limit retry → _initRadar → _scheduleUpdate;
+    // sleep/wake → stale re-init → _scheduleUpdate), and without
+    // cancellation each survivor kept firing — every parallel chain
+    // doubled the refresh rate and, before the newness guard, the rate
+    // of destructive duplicate-shifts too. Cancel-before-arm plus the
+    // generation check below makes forking impossible.
+    this._cancelScheduledUpdate?.();
     const framePeriod = 300_000;
     // RainViewer publishes ~1 min after the timestamp; DWD ~1–3 min; NOAA's lag is already baked in.
     const lag = (this._cfg.data_source ?? 'RainViewer') === 'NOAA' ? 0 : 60_000;
-    this._workerTimeout(() => {
+    const genAtArm = this._frameGeneration;
+    this._cancelScheduledUpdate = this._workerTimeout(() => {
+      this._cancelScheduledUpdate = null;
+      // A teardown / re-init happened after this timer was armed. The
+      // re-init path arms its own chain; acting here would fork.
+      if (genAtArm !== this._frameGeneration) return;
       if (this._radarReady && !this.navPaused && !this.viewPaused) {
         this._updateRadar();
       } else {
@@ -2024,7 +2069,32 @@ export class RadarPlayer {
     }
     if (myGen !== this._frameGeneration) return; // torn down while fetching
     if (pastFrames.length === 0) { this._scheduleUpdate(); return; } // no frames from API
+
+    // Newness guard: only shift the loop when the source actually
+    // published a frame newer than what we hold. The refresh cycle
+    // (~6 min) is faster than every source's publication cadence
+    // (RainViewer 10 min; NOAA ~5-9 min with server-side snapping; DWD
+    // 5 min but the locally computed timestamps can land on the same
+    // grid slot) — so roughly every other refresh used to fetch the
+    // SAME newest frame, append it as a duplicate, and destroy a real
+    // historical frame at slot 0. On a long-running dashboard the loop
+    // monotonically filled with adjacent duplicate pairs while its time
+    // span shrank. For RainViewer the timestamps come from the
+    // weather-maps.json frame listing, so this comparison is exactly
+    // "did the listing gain a new entry"; for NOAA/DWD the computed
+    // timestamps serve the same role.
+    const currentNewestTime = this._radarPaths[this._radarPaths.length - 1]?.time ?? 0;
     const latestFrame = pastFrames[pastFrames.length - 1];
+    if (latestFrame.time <= currentNewestTime) {
+      // Nothing new published. The fetch itself succeeded, so the data
+      // is verifiably current — bump the freshness clock so the
+      // visibility-resume staleness heuristic doesn't trigger a full
+      // re-init just because the source was slow to publish.
+      this._lastFrameRefreshAt = Date.now();
+      this._doRadarUpdate = false;
+      this._scheduleUpdate();
+      return;
+    }
     const frameCount = this._configFrameCount;
 
     const newLayer = this._createLayer(latestFrame);
@@ -2127,18 +2197,42 @@ export class RadarPlayer {
         }
       };
     `;
-    this._workerBlobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
-    this._worker = new Worker(this._workerBlobUrl);
-    this._worker.onmessage = (e) => {
-      const cb = this._workerCallbacks.get(e.data.id);
-      if (cb) { this._workerCallbacks.delete(e.data.id); cb(); }
-    };
+    // Guarded like createLkWorker in lk-worker.ts: strict CSPs block
+    // blob: workers, and an unguarded throw here aborts the
+    // RadarPlayer constructor mid-_initMap, killing the whole card.
+    // On failure _worker stays null and _workerTimeout's setTimeout
+    // fallback takes over — timers then throttle in hidden tabs, but
+    // the stale-resume re-init covers that case.
+    try {
+      this._workerBlobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+      this._worker = new Worker(this._workerBlobUrl);
+      this._worker.onmessage = (e) => {
+        const cb = this._workerCallbacks.get(e.data.id);
+        if (cb) { this._workerCallbacks.delete(e.data.id); cb(); }
+      };
+    } catch {
+      if (this._workerBlobUrl) { URL.revokeObjectURL(this._workerBlobUrl); this._workerBlobUrl = null; }
+      this._worker = null;
+    }
   }
 
-  private _workerTimeout(cb: () => void, delay: number): void {
-    if (!this._worker) { setTimeout(cb, delay); return; }
+  /**
+   * Arm a timer (worker-side when available so it keeps ticking in
+   * throttled background tabs; setTimeout fallback otherwise). Returns
+   * a cancel function — both paths support cancellation so callers can
+   * maintain a single-armed-timer invariant.
+   */
+  private _workerTimeout(cb: () => void, delay: number): () => void {
+    if (!this._worker) {
+      const handle = setTimeout(cb, delay);
+      return () => clearTimeout(handle);
+    }
     const id = this._workerNextId++;
     this._workerCallbacks.set(id, cb);
     this._worker.postMessage({ type: 'setTimeout', id, delay });
+    return () => {
+      this._workerCallbacks.delete(id);
+      this._worker?.postMessage({ type: 'clearTimeout', id });
+    };
   }
 }
