@@ -89,6 +89,9 @@ export class NwsAlertsLayer {
   // Used by resume() to decide whether to refetch immediately.
   private _pausedAt: number | null = null;
   private _gen = 0;
+  // Consecutive _fetch failures. Drives the retry backoff below; reset
+  // to 0 on any successful fetch.
+  private _failureCount = 0;
   // Cancellation for the alerts-list fetch (set per _fetch call) and the
   // per-zone fetches (single shared controller — they all become stale
   // together when the layer tears down or the alert list is replaced).
@@ -186,15 +189,24 @@ export class NwsAlertsLayer {
       // Deliberate cancellation (teardown / superseded). Drop silently;
       // the new fetch is already in flight or the layer is going away.
       if ((err as Error)?.name === 'AbortError') return;
-      // Transient: NWS occasionally returns 5xx during outages. Retry on
-      // the next scheduled interval; don't blow away currently-displayed
-      // alerts (this._features is left intact below if features stays []).
+      // Failure: NWS occasionally returns 5xx during outages, and its
+      // rate limiter blocks WITHOUT CORS headers — the browser surfaces
+      // that as a statusless "TypeError: Failed to fetch". Don't blow
+      // away currently-displayed alerts, and DON'T retry on the normal
+      // cadence: with alerts displayed that was a 60-second hammer
+      // against the very host that's rate-limiting us, which kept the
+      // block alive indefinitely (observed live: repeated fetch-failed
+      // errors with no recovery). Exponential backoff instead — first
+      // retry stays quick for blips, persistent blocks back off to a
+      // 30-minute cap. Reset on success.
       console.warn('NWS alerts: fetch failed', err);
-      this._scheduleNext();
+      this._failureCount++;
+      this._scheduleRetry();
       return;
     }
     if (myGen !== this._gen) return;   // stale
     if (this._abortCtrl === ctrl) this._abortCtrl = null;
+    this._failureCount = 0;
 
     // Filter, then sort lexicographically by (severity, urgency,
     // certainty) so the most actionable alerts paint last and end up
@@ -472,6 +484,22 @@ export class NwsAlertsLayer {
   /** 80% of the current map height, floored at 200 px so a tiny / not-yet-sized map still produces a usable popup. */
   private _popupMaxHeight(): number {
     return Math.max(200, Math.floor(this._map.getSize().y * 0.8));
+  }
+
+  /** Backoff delay for the Nth consecutive failure (1-based). */
+  private _retryDelayMs(failures: number): number {
+    const base = 60_000;                       // first retry: quick (blip)
+    const capped = Math.min(failures - 1, 10); // avoid 2**huge
+    return Math.min(base * 2 ** capped, 30 * 60_000);
+  }
+
+  // Failure-path counterpart of _scheduleNext: same paused guard, but
+  // the delay ladder is driven by consecutive failures instead of the
+  // normal refresh cadence.
+  private _scheduleRetry(): void {
+    if (this._pausedAt != null) return;
+    if (this._timer) clearTimeout(this._timer);
+    this._timer = setTimeout(() => void this._fetch(), this._retryDelayMs(this._failureCount));
   }
 
   private _scheduleNext(): void {
