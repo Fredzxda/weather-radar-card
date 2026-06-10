@@ -37,7 +37,7 @@ vi.mock('leaflet', () => {
   };
 });
 
-import { RadarPlayer, type RadarFrame } from '../src/radar-player';
+import { RadarPlayer, coverageClipPath, type RadarFrame } from '../src/radar-player';
 import type { WeatherRadarCardConfig } from '../src/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -269,5 +269,76 @@ describe('_scheduleUpdate single-chain invariant', () => {
 
     vi.advanceTimersByTime(400_000);
     expect(p._updateRadar).not.toHaveBeenCalled();
+  });
+});
+
+// ── 5. Coverage clip-path builder ────────────────────────────────────────
+
+describe('coverageClipPath', () => {
+  // Builds the radar pane's clip-path from captured coverage-mask
+  // pixels: interior (alpha ≤ 8) becomes scanline-run rectangles;
+  // wash/outline (alpha > 8) is excluded. Uses clip-path rather than
+  // mask-image because Leaflet panes are 0×0 boxes — CSS masking clips
+  // its painting area to the element box (everything vanished), and
+  // Chrome misrenders mask-clip:no-clip on a zero box (verified via
+  // .dev/mask-clip-repro.html). clip-path is geometric: px coordinates
+  // resolve from the pane origin regardless of box size.
+
+  /** Build RGBA data from a string grid: '.' interior, '#' exterior. */
+  function grid(rows: string[]): { data: Uint8ClampedArray; w: number; h: number } {
+    const h2 = rows.length;
+    const w2 = rows[0].length;
+    const data = new Uint8ClampedArray(w2 * h2 * 4);
+    rows.forEach((row, y) => {
+      [...row].forEach((ch, x) => {
+        data[(y * w2 + x) * 4 + 3] = ch === '#' ? 200 : 0;
+      });
+    });
+    return { data, w: w2, h: h2 };
+  }
+
+  it('all-interior grid collapses to a single rect (vertical merge)', () => {
+    const g = grid(['....', '....', '....']);
+    const path = coverageClipPath(g.data, g.w, g.h, 2, 2, 0, 0);
+    expect(path).toBe('M0 0h8v6h-8Z');
+  });
+
+  it('all-exterior grid returns empty string', () => {
+    const g = grid(['####', '####']);
+    expect(coverageClipPath(g.data, g.w, g.h, 2, 2, 0, 0)).toBe('');
+  });
+
+  it('left-half interior produces one merged left rect', () => {
+    const g = grid(['..##', '..##']);
+    const path = coverageClipPath(g.data, g.w, g.h, 2, 2, 0, 0);
+    expect(path).toBe('M0 0h4v4h-4Z');
+  });
+
+  it('a hole splits the row into two runs', () => {
+    const g = grid(['.#.']);
+    const path = coverageClipPath(g.data, g.w, g.h, 1, 1, 0, 0);
+    // Two unit rects around the exterior pixel.
+    expect(path).toContain('M0 0h1v1h-1Z');
+    expect(path).toContain('M2 0h1v1h-1Z');
+  });
+
+  it('applies scale and offset (canvas px → layer-point px)', () => {
+    const g = grid(['..']);
+    const path = coverageClipPath(g.data, g.w, g.h, 2, 2, -100.25, 50);
+    // Math.round(-1002.5) rounds toward +Infinity → -100.2
+    expect(path).toBe('M-100.2 50h4v2h-4Z');
+  });
+
+  it('rows with different spans do not merge', () => {
+    const g = grid(['...', '..#']);
+    const path = coverageClipPath(g.data, g.w, g.h, 1, 1, 0, 0);
+    expect(path).toBe('M0 0h3v1h-3ZM0 1h2v1h-2Z');
+  });
+
+  it('antialiased fringe (alpha ≤ 8) counts as interior', () => {
+    const data = new Uint8ClampedArray(2 * 1 * 4);
+    data[3] = 8;      // fringe — interior
+    data[7] = 9;      // just over — exterior
+    expect(coverageClipPath(data, 2, 1, 1, 1, 0, 0)).toBe('M0 0h1v1h-1Z');
   });
 });

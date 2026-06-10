@@ -160,6 +160,90 @@ function makeDwdMaskOnlyFilter(
   };
 }
 
+/**
+ * Build a CSS `clip-path: path(...)` string covering the coverage
+ * INTERIOR, from the shared coverage-mask layer's captured pixels.
+ *
+ * Input: RGBA from the coverage-mask tiles drawn to a (downscaled)
+ * canvas — wash/outline pixels carry alpha > 0 (the no-data EXTERIOR),
+ * interior pixels are transparent. Output: a path made of scanline-run
+ * rectangles over interior pixels, with vertically-identical runs
+ * merged (a fully-interior viewport collapses to a single rect).
+ * Returns '' when no interior pixel exists.
+ *
+ * Why clip-path and not mask-image: Leaflet panes are 0×0 positioned
+ * containers, and CSS masking clips its painting area to the element
+ * box — `mask-clip: border-box` (default) masked everything out, and
+ * Chrome's `mask-clip: no-clip` misrenders on a zero box (verified
+ * with a standalone repro: a thin strip instead of the masked image).
+ * clip-path is a geometric clip with no painting-area concept; pixel
+ * coordinates resolve from the reference-box origin — the pane origin
+ * — regardless of box size, which the same repro confirmed working.
+ *
+ * Why clip at all: nowcast frames carry a different no-data geometry
+ * than the analysis frame the displayed boundary is pinned to, so
+ * forecast rain can legitimately extend past the drawn outline; and
+ * motion compensation slides whole layers, pushing edge rain over the
+ * boundary during transitions. Clipping the pane solves both. The
+ * rectangle quantisation (one canvas pixel ≈ 2 screen px) is hidden
+ * under the drawn boundary outline.
+ *
+ * scaleX/scaleY map canvas pixels → screen px; offsetX/offsetY place
+ * canvas (0,0) in the pane's (layer-point) coordinate space.
+ *
+ * Exported for unit tests.
+ */
+export function coverageClipPath(
+  data: Uint8ClampedArray, w: number, h: number,
+  scaleX: number, scaleY: number, offsetX: number, offsetY: number,
+): string {
+  // Alpha above this = exterior (wash/outline). The wash's antialiased
+  // fringe (tiny alphas) counts as interior so the clip sits slightly
+  // outside the visual boundary line rather than inside it.
+  const EXTERIOR_ALPHA = 8;
+  interface Rect { x0: number; x1: number; y0: number; y1: number; }
+  const open = new Map<string, Rect>();   // runs continuing from the previous row
+  const done: Rect[] = [];
+  for (let y = 0; y < h; y++) {
+    const next = new Map<string, Rect>();
+    let runStart = -1;
+    for (let x = 0; x <= w; x++) {
+      const interior = x < w && data[(y * w + x) * 4 + 3] <= EXTERIOR_ALPHA;
+      if (interior && runStart < 0) runStart = x;
+      if (!interior && runStart >= 0) {
+        const key = `${runStart}:${x}`;
+        const prev = open.get(key);
+        if (prev && prev.y1 === y) {
+          prev.y1 = y + 1;            // identical span continues — extend
+          next.set(key, prev);
+        } else {
+          next.set(key, { x0: runStart, x1: x, y0: y, y1: y + 1 });
+        }
+        runStart = -1;
+      }
+    }
+    // Runs that didn't continue into this row are finished.
+    for (const [key, rect] of open) {
+      if (!next.has(key) || next.get(key) !== rect) done.push(rect);
+    }
+    open.clear();
+    for (const [key, rect] of next) open.set(key, rect);
+  }
+  done.push(...open.values());
+
+  if (done.length === 0) return '';
+  const fmt = (n: number): string => (Math.round(n * 10) / 10).toString();
+  let path = '';
+  for (const r of done) {
+    const x = offsetX + r.x0 * scaleX;
+    const y = offsetY + r.y0 * scaleY;
+    const rw = (r.x1 - r.x0) * scaleX;
+    const rh = (r.y1 - r.y0) * scaleY;
+    path += `M${fmt(x)} ${fmt(y)}h${fmt(rw)}v${fmt(rh)}h${fmt(-rw)}Z`;
+  }
+  return path;
+}
+
 // Parse any CSS colour ("rgba(0,0,0,0.3)", "#ff00ff", "magenta",
 // "transparent", …) into [r, g, b, a] bytes via the canvas 2D context.
 // Returns null if the string didn't parse — assigning an invalid value
@@ -424,6 +508,9 @@ export class RadarPlayer {
     // arrive, overwriting with a fresher snapshot.
     this._invalidateSnapshots();
     void this._resnapshotAll();
+    // Viewport changed — the radar-pane coverage clip is positioned in
+    // layer-point space and sized to the viewport, so rebuild it.
+    void this._updateCoverageClip();
   };
 
   private _onMoveEnd = (): void => {
@@ -438,6 +525,9 @@ export class RadarPlayer {
     // those up later and overwrites with the fresher snapshot.
     this._invalidateSnapshots();
     void this._resnapshotAll();
+    // Viewport changed — the radar-pane coverage clip is positioned in
+    // layer-point space and sized to the viewport, so rebuild it.
+    void this._updateCoverageClip();
   };
 
   // Map container size changed (window resize, parent reflow, theme
@@ -450,6 +540,9 @@ export class RadarPlayer {
   private _onResize = (): void => {
     this._invalidateSnapshots();
     void this._resnapshotAll();
+    // Viewport changed — the radar-pane coverage clip is positioned in
+    // layer-point space and sized to the viewport, so rebuild it.
+    void this._updateCoverageClip();
   };
 
   // ── Motion compensation: snapshot + LK pipeline ──────────────────────
@@ -1651,6 +1744,94 @@ export class RadarPlayer {
   private _clearCoverageMask(): void {
     this._coverageMask?.remove();
     this._coverageMask = null;
+    this._clearCoverageClip();
+  }
+
+  // Remove the pane clip — non-DWD sources and teardown must leave the
+  // radar pane unclipped.
+  private _clearCoverageClip(): void {
+    const pane = this._map?.getPane(RADAR_PANE_NAME);
+    if (!pane) return;
+    pane.style.clipPath = '';
+  }
+
+  // Build / refresh the clip-path that confines the radar pane to the
+  // coverage region. Captures the shared coverage-mask layer's tiles
+  // into a half-resolution canvas covering the viewport plus a 25%
+  // margin on each side (so interactive pans don't reveal unclipped
+  // edges before the moveend rebuild), then converts the interior into
+  // scanline-run rectangles via coverageClipPath and applies them as
+  // `clip-path: path(...)` on the radar pane, in layer-point
+  // coordinates so the clip stays glued to geography while Leaflet
+  // translates the map pane.
+  //
+  // Re-run on: coverage-mask 'load' (tiles arrived/refreshed), and
+  // moveend / zoomend / resize (viewport changed — same events that
+  // already invalidate motion-comp snapshots). _snapshotGen guards
+  // against a stale async capture applying after the view changed.
+  private async _updateCoverageClip(): Promise<void> {
+    const mask = this._coverageMask;
+    if (!mask || !this._map) return;
+    const container = (mask as { getContainer?: () => HTMLElement | null }).getContainer?.();
+    if (!container) return;
+    const tiles = container.querySelectorAll<HTMLImageElement>('img.leaflet-tile');
+    if (tiles.length === 0) return;
+    const genAtStart = this._snapshotGen;
+    await Promise.all(Array.from(tiles).map((t) => {
+      if (t.complete && t.naturalWidth > 0) return Promise.resolve();
+      return t.decode().catch(() => { /* broken tile; skipped at draw */ });
+    }));
+    if (genAtStart !== this._snapshotGen) return;
+    if (this._coverageMask !== mask) return;
+
+    const size = this._map.getSize();
+    // 25% margin each side: Leaflet keeps a buffer ring of loaded tiles
+    // around the viewport, so the captured area beyond the viewport is
+    // usually real data; areas with no tile read as alpha-0 → interior
+    // → unclipped, which fails open (rain visible) rather than black.
+    const padX = Math.ceil(size.x / 4);
+    const padY = Math.ceil(size.y / 4);
+    const fullW = size.x + 2 * padX;
+    const fullH = size.y + 2 * padY;
+    const w = Math.max(1, Math.ceil(fullW / 2));
+    const h = Math.max(1, Math.ceil(fullH / 2));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const mapRect = this._map.getContainer().getBoundingClientRect();
+    const xScale = w / fullW;
+    const yScale = h / fullH;
+    for (const tileImg of Array.from(tiles)) {
+      if (!tileImg.complete || tileImg.naturalWidth === 0) continue;
+      const tr = tileImg.getBoundingClientRect();
+      try {
+        ctx.drawImage(
+          tileImg,
+          (tr.left - mapRect.left + padX) * xScale,
+          (tr.top - mapRect.top + padY) * yScale,
+          tr.width * xScale,
+          tr.height * yScale,
+        );
+      } catch { /* tainted/broken tile — skip */ }
+    }
+    const imgData = ctx.getImageData(0, 0, w, h);
+
+    const pane = this._map.getPane(RADAR_PANE_NAME);
+    if (!pane) return;
+    // Canvas (0,0) corresponds to container point (-padX, -padY);
+    // express it in layer-point space (the pane's coordinate system).
+    const origin = this._map.containerPointToLayerPoint([-padX, -padY]);
+    const path = coverageClipPath(
+      imgData.data, w, h,
+      fullW / w, fullH / h,
+      origin.x, origin.y,
+    );
+    // Empty path = no interior pixel anywhere in the captured area
+    // (viewport fully outside coverage). Hide the pane's rain — there
+    // is no valid radar data to show there anyway.
+    pane.style.clipPath = path ? `path("${path}")` : 'inset(100%)';
   }
 
   // Create the single shared coverage mask. Uses the newest PAST
@@ -1682,6 +1863,9 @@ export class RadarPlayer {
     const mask = this._createDwdMaskLayer(anchor, layerName);
     if (!mask) return;
     this._coverageMask = mask;
+    // Rebuild the radar-pane clip whenever the mask's tiles settle —
+    // initial load and any pan/zoom refetches alike.
+    mask.on('load', () => { void this._updateCoverageClip(); });
     if (this._map) mask.addTo(this._map);
   }
 
