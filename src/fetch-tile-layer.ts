@@ -125,6 +125,24 @@ export function createFetchTile(
         if (r.status === 404) { const e: any = new Error('404'); e.status = 404; throw e; }
         if (r.status === 429) { const e: any = new Error('429'); e.status = 429; throw e; }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // Soft-error tiles: NOAA's WMS sometimes answers 200 OK with a
+        // small text/xml error document instead of a PNG (observed
+        // ~240 bytes; likely a rate-limit the server doesn't surface
+        // as 429). Assigning that blob to the <img> just fails decode
+        // silently — the tile rendered blank, done() reported success,
+        // and nothing ever retried. Detect by content-type and route
+        // through the bounded retry path: `e.status = 200` is honest
+        // (it WAS a 200) and deliberately keeps the error out of both
+        // the 404-fail branch and the statusless-rate-limit branch in
+        // the catch below, landing it on the attempt-capped retry. A
+        // missing content-type header is left alone (assumed image) so
+        // sources that omit the header keep working.
+        const ctype = r.headers.get('content-type') ?? '';
+        if (ctype.includes('xml') || ctype.includes('html') || ctype.startsWith('text/')) {
+          const e: any = new Error(`non-image tile response (${ctype})`);
+          e.status = 200;
+          throw e;
+        }
         return r.blob();
       })
       .then((blob) => {

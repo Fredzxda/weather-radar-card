@@ -291,7 +291,7 @@ describe('wireAbortLifecycle (fetch-tile-layer)', () => {
 // ── createFetchTile integration ───────────────────────────────────────────
 
 describe('createFetchTile (fetch-tile-layer)', () => {
-  let fetchCalls: Array<{ url: string; signal: AbortSignal | undefined; resolve: (b: Blob) => void; reject: (err: Error) => void }>;
+  let fetchCalls: Array<{ url: string; signal: AbortSignal | undefined; resolve: (b: Blob, init2?: ResponseInit) => void; reject: (err: Error) => void }>;
   const realFetch = global.fetch;
 
   beforeEach(() => {
@@ -300,7 +300,7 @@ describe('createFetchTile (fetch-tile-layer)', () => {
       let resolve!: (b: Blob) => void;
       let reject!: (err: Error) => void;
       const responsePromise = new Promise<Response>((res, rej) => {
-        resolve = (b: Blob) => res(new Response(b, { status: 200 }));
+        resolve = (b: Blob, init2?: ResponseInit) => res(new Response(b, init2 ?? { status: 200 }));
         reject = (err: Error) => rej(err);
       });
       const signal = init?.signal as AbortSignal | undefined;
@@ -379,5 +379,65 @@ describe('createFetchTile (fetch-tile-layer)', () => {
     expect(layer._tilePending).toBe(0);
     expect(layer._tileFailed).toBe(1);
     expect(done).toHaveBeenCalled();
+  });
+
+  // ── Soft-error tiles (200 OK + text/xml body) ─────────────────────────
+  //
+  // NOAA's WMS sometimes answers 200 with a small XML error document
+  // instead of a PNG (observed ~240 bytes — likely a rate-limit the
+  // server doesn't surface as 429). These used to be treated as valid
+  // tiles: the blob failed <img> decode silently, the tile rendered
+  // blank, done() reported success, and nothing retried.
+
+  it('retries a 200-with-XML-body tile and succeeds when the retry returns an image', async () => {
+    const layer = makeFetchLayerStub();
+    layer.options = { maxRetries: 2, retryDelay: 0 };
+    const done = vi.fn();
+    createFetchTile.call(layer as never, { x: 0, y: 0, z: 0 } as never, done);
+
+    // First response: 200 OK but an XML error document.
+    fetchCalls[0].resolve(
+      new Blob(['<ServiceExceptionReport/>'], { type: 'text/xml' }),
+      { status: 200, headers: { 'content-type': 'text/xml' } },
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    expect(fetchCalls.length).toBe(2);          // it retried
+
+    // Retry returns a real image — tile loads normally.
+    fetchCalls[1].resolve(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: 'image/png' }),
+      { status: 200, headers: { 'content-type': 'image/png' } },
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    expect(layer._tileLoaded).toBe(1);
+    expect(layer._tileFailed).toBe(0);
+    expect(done).toHaveBeenCalled();
+  });
+
+  it('a persistent XML-body tile exhausts retries and counts as failed (not silent success)', async () => {
+    const layer = makeFetchLayerStub();   // maxRetries: 1 — fail after first soft error
+    const done = vi.fn();
+    createFetchTile.call(layer as never, { x: 0, y: 0, z: 0 } as never, done);
+
+    fetchCalls[0].resolve(
+      new Blob(['<ServiceExceptionReport/>'], { type: 'text/xml' }),
+      { status: 200, headers: { 'content-type': 'text/xml' } },
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    expect(layer._tileFailed).toBe(1);
+    expect(layer._tileLoaded).toBe(0);
+    expect(done).toHaveBeenCalled();
+  });
+
+  it('a missing content-type header is still treated as an image (no false soft-error)', async () => {
+    const layer = makeFetchLayerStub();
+    const done = vi.fn();
+    createFetchTile.call(layer as never, { x: 0, y: 0, z: 0 } as never, done);
+
+    // Blob with empty type → Response carries no meaningful content-type.
+    fetchCalls[0].resolve(new Blob([new Uint8Array([0x89, 0x50])]));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(layer._tileLoaded).toBe(1);
+    expect(layer._tileFailed).toBe(0);
   });
 });
