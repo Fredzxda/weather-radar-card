@@ -8,6 +8,7 @@ import {
   ALL_ALERT_CATEGORIES, categoryForEvent, getActiveAlertCategories,
 } from './nws-alert-categories';
 import { centroidLngLat, haversineKm } from './geo-utils';
+import { sharedCanvasRenderer } from './shared-canvas-renderer';
 import { escapeHtml, truncate } from './string-utils';
 
 // NWS public API — see docs/nws-alerts-feature-design.md.
@@ -125,6 +126,9 @@ export class NwsAlertsLayer {
     this._zoneAbortCtrl = null;
     if (this._timer) { clearTimeout(this._timer); this._timer = null; }
     if (this._polygonLayer) { this._map.removeLayer(this._polygonLayer); this._polygonLayer = null; }
+    // The shared canvas renderer is deliberately NOT removed — the
+    // wildfire layer may still be drawing through it (map-lifetime,
+    // see shared-canvas-renderer.ts).
     this._features = [];
     this._renderDecisions.clear();
     this._zoneCache.clear();
@@ -459,7 +463,18 @@ export class NwsAlertsLayer {
 
     if (renderable.length === 0) return;
 
+    // Canvas instead of one SVG node per polygon ring — alert outbreaks
+    // routinely carry hundreds of multi-ring zone shapes, and the
+    // per-node DOM cost is what makes pan/zoom heavy. MUST be the
+    // map-shared renderer, never a private L.canvas() — see
+    // shared-canvas-renderer.ts for why stacked canvas renderers
+    // swallow each other's clicks. Popup wiring is unchanged: the
+    // canvas renderer does its own hit-testing.
+    // The cast: `renderer` is a real option here — GeoJSON forwards its
+    // whole options bag to every child Path via geometryToLayer — but
+    // @types/leaflet's GeoJSONOptions doesn't declare it.
     this._polygonLayer = L.geoJSON(renderable, {
+      renderer: sharedCanvasRenderer(this._map),
       style: (feature) => {
         const event = (feature?.properties as AlertProps | null)?.event;
         const colour = colorForEvent(event);
@@ -477,7 +492,7 @@ export class NwsAlertsLayer {
           { autoPan: true, autoPanPadding: [12, 12], maxHeight: this._popupMaxHeight() },
         );
       },
-    });
+    } as L.GeoJSONOptions);
     this._polygonLayer.addTo(this._map);
   }
 
