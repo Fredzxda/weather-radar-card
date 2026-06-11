@@ -331,7 +331,9 @@ Design sketch (clickability confirmed feasible for both):
 - **Lightning strikes**: custom `L.Layer` painting strikes into one canvas
   per map (redraw on move/zoom/age-tick; age-based fade becomes a cheap
   global-alpha pass instead of per-marker style writes). Markers lose DOM
-  hit-testing, so add a DIY hit test: map `click` → nearest strike within
-  ~10 px tolerance → open the existing popup content at that latlng.
+  hit-testing, so add a DIY hit test: map `click` → **most recent** strike
+  within 10 px tolerance (recency wins over distance when several strikes
+  overlap — the fresh strike is the one the user is reacting to) → open the
+  existing popup content at that latlng.
   ~200–250 lines incl. tests; the strike data model and `_collectStrikes`
   pipeline stay as-is.

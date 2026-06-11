@@ -1513,28 +1513,6 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
       @media (prefers-reduced-motion: reduce) {
         .loading-spinner-arc { animation: none; }
       }
-      /* Lightning overlay (Blitzortung). The divIcon outer container
-         carries the animation; the inner SVG paints the bolt. overflow:
-         visible on the SVG lets the brief scale(2) flash spill outside
-         the divIcon box without being clipped. */
-      .wrc-lightning-icon {
-        pointer-events: auto;
-        cursor: pointer;
-      }
-      .wrc-lightning-icon svg {
-        overflow: visible;
-      }
-      @keyframes wrc-lightning-pulse {
-        0%   { transform: scale(2);   filter: brightness(2); opacity: 1; }
-        60%  { transform: scale(1.3); filter: brightness(1.4); opacity: 1; }
-        100% { transform: scale(1);   filter: brightness(1);   opacity: 1; }
-      }
-      .wrc-lightning-pulse {
-        animation: wrc-lightning-pulse 600ms ease-out;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .wrc-lightning-pulse { animation: none; }
-      }
     `,
   ];
 }

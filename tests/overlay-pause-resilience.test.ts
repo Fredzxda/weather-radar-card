@@ -295,50 +295,162 @@ describe('failure backoff ladders', () => {
   });
 });
 
-// ── Lightning strike-backlog drain (live-debugged: editor-open lockup) ──
+// ── Lightning canvas layer: hit-test + draw order ────────────────────────
 //
-// Each strike materialises as two DOM markers with inline SVG; a fresh
-// mount during an active storm used to build the whole backlog (often
-// hundreds of strikes, and editor-open runs TWO card instances) in one
-// synchronous pass — multi-second UI freeze. Additions now queue and
-// drain newest-first in time-budgeted slices per animation frame.
+// The DOM-marker implementation (and its time-sliced backlog drain) was
+// replaced by a single canvas — strikes are painted, not mounted, so the
+// per-strike DOM cost that froze editor-open is structurally gone. What
+// needs regression coverage now is the DIY interaction layer the canvas
+// brought with it: the click hit-test (MOST RECENT strike within
+// tolerance wins, per user decision — recency beats distance when
+// strikes overlap) and the painters-algorithm draw order.
 
-describe('LightningLayer pending-add drain', () => {
+describe('LightningLayer canvas hit-test', () => {
   async function bareLightning(): Promise<any> {
     const { LightningLayer } = await import('../src/lightning-layer');
     const l = Object.create(LightningLayer.prototype);
     l._strikes = new Map();
-    l._pendingAdds = [];
-    l._drainScheduled = false;
-    l._addMarker = vi.fn();
-    l._removeMarker = vi.fn();
+    // Identity projection: strikes store container px directly in lat/lon.
+    l._map = { latLngToContainerPoint: ([lat, lon]: [number, number]) => ({ x: lon, y: lat }) };
+    l._padX = 0;
+    l._padY = 0;
     return l;
   }
 
-  it('drains newest-first and stops at the time budget', async () => {
+  it('picks the most recent strike within tolerance, not the nearest', async () => {
     const l = await bareLightning();
-    for (let i = 0; i < 5; i++) {
-      const id = `geo_location.s${i}`;
-      const strike = { ts: 1000 + i, lat: 0, lon: 0, isBolt: false };
-      l._strikes.set(id, strike);
-      l._pendingAdds.push([id, strike]);
-    }
-    // Make each _addMarker "cost" enough that a 0ms budget stops after one.
-    l._drainPendingAdds(0);
-    expect(l._addMarker).toHaveBeenCalledTimes(1);
-    // Newest strike (largest ts) materialised first.
-    expect(l._addMarker.mock.calls[0][1].ts).toBe(1004);
-    // Generous budget drains the rest.
-    l._drainPendingAdds(1000);
-    expect(l._addMarker).toHaveBeenCalledTimes(5);
-    expect(l._pendingAdds).toHaveLength(0);
+    // Older strike 1px from the click; newer strike 8px away. Both are
+    // inside the 10px tolerance — recency must win.
+    l._strikes.set('geo_location.older_closer', { ts: 1000, lat: 100, lon: 101, pulseUntil: 0 });
+    l._strikes.set('geo_location.newer_farther', { ts: 2000, lat: 100, lon: 108, pulseUntil: 0 });
+    expect(l._hitTest({ x: 100, y: 100 })).toBe('geo_location.newer_farther');
   });
 
-  it('skips strikes removed while queued', async () => {
+  it('falls back to the nearer strike when the newer one is out of tolerance', async () => {
     const l = await bareLightning();
-    const strike = { ts: 1000, lat: 0, lon: 0, isBolt: false };
-    l._pendingAdds.push(['geo_location.gone', strike]);   // NOT in _strikes
-    l._drainPendingAdds(1000);
-    expect(l._addMarker).not.toHaveBeenCalled();
+    l._strikes.set('geo_location.older_closer', { ts: 1000, lat: 100, lon: 101, pulseUntil: 0 });
+    l._strikes.set('geo_location.newer_farther', { ts: 2000, lat: 100, lon: 120, pulseUntil: 0 });
+    expect(l._hitTest({ x: 100, y: 100 })).toBe('geo_location.older_closer');
+  });
+
+  it('returns null when nothing is within tolerance', async () => {
+    const l = await bareLightning();
+    l._strikes.set('geo_location.far', { ts: 1000, lat: 500, lon: 500, pulseUntil: 0 });
+    expect(l._hitTest({ x: 100, y: 100 })).toBeNull();
+  });
+
+  it('tolerance is a radius: 10px away hits, 11px misses', async () => {
+    const l = await bareLightning();
+    l._strikes.set('geo_location.edge', { ts: 1000, lat: 100, lon: 110, pulseUntil: 0 });
+    expect(l._hitTest({ x: 100, y: 100 })).toBe('geo_location.edge');
+    expect(l._hitTest({ x: 89, y: 100 })).toBeNull();
+  });
+});
+
+describe('LightningLayer canvas draw order', () => {
+  // _drawOrder projects through LAYER points minus the canvas's pinned
+  // layer-point origin — NOT container points. Container points include
+  // the live drag delta, and a repaint mid-drag (hass tick, pulse frame)
+  // at container coordinates applied that delta on top of the pane's own
+  // transform: strikes visibly moved at 2× drag speed until moveend
+  // (live-debugged on the testbed). Layer points are drag-stable.
+  async function bareLightning(): Promise<any> {
+    const { LightningLayer } = await import('../src/lightning-layer');
+    const l = Object.create(LightningLayer.prototype);
+    l._strikes = new Map();
+    l._map = { latLngToLayerPoint: ([lat, lon]: [number, number]) => ({ x: lon, y: lat }) };
+    l._originLayerPoint = { x: 0, y: 0 };
+    return l;
+  }
+
+  it('sorts oldest-first so newer strikes paint on top, and derives bolt phase from age', async () => {
+    const l = await bareLightning();
+    const now = 100_000_000;
+    l._strikes.set('a', { ts: now - 60_000, lat: 10, lon: 10, pulseUntil: 0 });  // 60s old → plus
+    l._strikes.set('b', { ts: now - 5_000, lat: 20, lon: 20, pulseUntil: 0 });   // 5s old → bolt
+    l._strikes.set('c', { ts: now - 120_000, lat: 30, lon: 30, pulseUntil: 0 }); // 120s old → plus
+    const order = l._drawOrder(now, 1800, 200, 200, 20);
+    expect(order.map((d: any) => d.ts)).toEqual([now - 120_000, now - 60_000, now - 5_000]);
+    expect(order.map((d: any) => d.isBolt)).toEqual([false, false, true]);
+  });
+
+  it('culls strikes outside the canvas plus margin and past max age', async () => {
+    const l = await bareLightning();
+    const now = 100_000_000;
+    l._strikes.set('visible', { ts: now - 1_000, lat: 50, lon: 50, pulseUntil: 0 });
+    l._strikes.set('offcanvas', { ts: now - 1_000, lat: 50, lon: 500, pulseUntil: 0 });
+    l._strikes.set('expired', { ts: now - 2_000_000, lat: 60, lon: 60, pulseUntil: 0 });
+    const order = l._drawOrder(now, 1800, 200, 200, 20);
+    expect(order).toHaveLength(1);
+    expect(order[0].x).toBe(50);
+  });
+
+  it('paints relative to the pinned canvas origin (drag-stable layer coords)', async () => {
+    const l = await bareLightning();
+    const now = 100_000_000;
+    l._originLayerPoint = { x: -30, y: -40 };
+    l._strikes.set('s', { ts: now - 1_000, lat: 10, lon: 20, pulseUntil: 0 });
+    const order = l._drawOrder(now, 1800, 200, 200, 20);
+    expect(order[0].x).toBe(50);   // 20 - (-30)
+    expect(order[0].y).toBe(50);   // 10 - (-40)
+  });
+});
+
+// ── Settled-strike buffer invalidation ──────────────────────────────────
+//
+// The offscreen buffer holds every strike older than the bolt window;
+// each pulse frame is a blit + the live tail instead of an O(strikes)
+// full repaint. Live-debugged: a 5000-strike stress config saturated
+// the main thread because every arriving strike's 600 ms pulse ran ~36
+// full-set repaints. The win depends on ARRIVALS NOT INVALIDATING THE
+// BUFFER — these tests pin the invalidation rules.
+
+describe('LightningLayer buffer invalidation', () => {
+  async function bareLightning(): Promise<any> {
+    const { LightningLayer } = await import('../src/lightning-layer');
+    const l = Object.create(LightningLayer.prototype);
+    l._strikes = new Map();
+    l._bufferDirty = false;
+    l._bufferMaxTs = 50_000;
+    l._scheduleRedraw = vi.fn();
+    return l;
+  }
+
+  it('a fresh strike arrival does NOT dirty the buffer (draws live)', async () => {
+    const l = await bareLightning();
+    l._collectStrikes = () => new Map([
+      ['geo_location.fresh', { ts: 60_000, lat: 0, lon: 0, pulseUntil: 0 }],
+    ]);
+    l._refreshFromHass();
+    expect(l._bufferDirty).toBe(false);
+    expect(l._scheduleRedraw).toHaveBeenCalled();
+  });
+
+  it('a backlog strike older than the buffer cutoff dirties it', async () => {
+    const l = await bareLightning();
+    l._collectStrikes = () => new Map([
+      ['geo_location.old', { ts: 40_000, lat: 0, lon: 0, pulseUntil: 0 }],
+    ]);
+    l._refreshFromHass();
+    expect(l._bufferDirty).toBe(true);
+  });
+
+  it('a removal dirties the buffer (strike may be baked in)', async () => {
+    const l = await bareLightning();
+    l._strikes.set('geo_location.gone', { ts: 40_000, lat: 0, lon: 0, pulseUntil: 0 });
+    l._collectStrikes = () => new Map();
+    l._refreshFromHass();
+    expect(l._bufferDirty).toBe(true);
+    expect(l._strikes.size).toBe(0);
+  });
+
+  it('a no-op tick neither dirties nor schedules', async () => {
+    const l = await bareLightning();
+    const strike = { ts: 60_000, lat: 0, lon: 0, pulseUntil: 0 };
+    l._strikes.set('geo_location.same', strike);
+    l._collectStrikes = () => new Map([['geo_location.same', strike]]);
+    l._refreshFromHass();
+    expect(l._bufferDirty).toBe(false);
+    expect(l._scheduleRedraw).not.toHaveBeenCalled();
   });
 });

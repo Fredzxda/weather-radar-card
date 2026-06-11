@@ -5,6 +5,7 @@ import { WeatherRadarCardConfig } from './types';
 import { FIRE_PATH } from './marker-icon';
 import { localize } from './localize/localize';
 import { centroidLngLat, geometryLngLatBounds, haversineKm } from './geo-utils';
+import { sharedCanvasRenderer } from './shared-canvas-renderer';
 import { escapeHtml, slugify } from './string-utils';
 
 // NIFC WFIGS Current Interagency Fire Perimeters — see docs/wildfire-feature-design.md.
@@ -126,6 +127,9 @@ export class WildfireLayer {
       this._zoomHandler = null;
     }
     if (this._polygonLayer) { this._map.removeLayer(this._polygonLayer); this._polygonLayer = null; }
+    // The shared canvas renderer is deliberately NOT removed — the
+    // alerts layer may still be drawing through it (map-lifetime,
+    // see shared-canvas-renderer.ts).
     if (this._iconLayer) { this._map.removeLayer(this._iconLayer); this._iconLayer = null; }
     this._features = [];
     this._renderDecisions.clear();
@@ -346,7 +350,19 @@ export class WildfireLayer {
     if (this._features.length === 0) return;
 
     if (polygons.length > 0) {
+      // Canvas instead of per-ring SVG nodes — WFIGS perimeter rings
+      // carry thousands of vertices each. MUST be the map-shared
+      // renderer, never a private L.canvas() — this layer creates its
+      // polygon layer lazily (only when a fire crosses the icon→polygon
+      // zoom threshold), and a second renderer created at that moment
+      // stacks over the alerts canvas and swallows its clicks from then
+      // on (see shared-canvas-renderer.ts). Fire icons stay DOM markers
+      // (bounded count, need the divIcon SVG glyph).
+      // The cast: `renderer` is a real option here — GeoJSON forwards its
+      // whole options bag to every child Path via geometryToLayer — but
+      // @types/leaflet's GeoJSONOptions doesn't declare it.
       this._polygonLayer = L.geoJSON(polygons, {
+        renderer: sharedCanvasRenderer(this._map),
         style: (feature) => {
           const contained = isContained(feature?.properties as WildfireProps | null);
           const color = contained ? containedColor : activeColor;
@@ -366,7 +382,7 @@ export class WildfireLayer {
             { autoPan: true, autoPanPadding: [12, 12], maxHeight: this._popupMaxHeight() },
           );
         },
-      });
+      } as L.GeoJSONOptions);
       this._polygonLayer.addTo(this._map);
     }
 

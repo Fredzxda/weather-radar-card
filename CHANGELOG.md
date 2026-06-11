@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Lightning strikes render on a single canvas instead of per-strike DOM markers.** Each strike previously mounted two DOM markers with inline SVG (fill + outline panes); during an active storm with a long `lightning_max_age_minutes` that's hundreds-to-thousands of nodes, which made pan/zoom heavy even after the 3.7.0-alpha3 time-sliced backlog drain. One canvas now holds every strike: two-pass painting preserves the stacked-outline look (outlines under fills, newest on top), the fresh-bolt pulse is drawn as a short rAF animation (still honours `prefers-reduced-motion`), and popups still work via a click hit-test — **the most recent strike within 10 px wins** (recency beats distance when strikes overlap; the fresh strike is the one you're reacting to). Hover still shows a pointer cursor over strikes. Settled strikes (past the 30 s bolt window) live in an offscreen buffer, so the steady-state repaint is one blit plus the newest strikes — a new strike arriving costs O(1), not a full-set repaint (the first cut repainted everything ~36× per arriving strike's pulse animation, which saturated the main thread under storm load). Soak-validated at 10,000 simultaneous strikes (Blitzortung's max) with the page fully responsive. No config changes.
+- **NWS alert polygons and wildfire perimeters render through Leaflet's canvas renderer — one shared renderer per map.** Alert outbreaks carry hundreds of multi-ring zone shapes and WFIGS perimeters carry thousands of vertices each; per-ring SVG nodes were the heavy part of pan/zoom with overlays on. Leaflet's canvas renderer keeps its own hit-testing, so popups and click behaviour are unchanged; fire icons remain DOM markers (bounded count). The shared-renderer constraint is load-bearing: a canvas renderer receives clicks as DOM events on its own canvas element, and with two renderers stacked the topmost silently swallows the other's clicks (observed live as alert polygons going permanently unclickable the moment the first fire perimeter crossed the icon→polygon zoom threshold and lazily spawned a second renderer on top).
+
 ## [3.7.0-alpha3] - 2026-06-10
 
 > **Alpha pre-release.** Stability wave for the 3.7 line: fixes for every finding from the 2026-06-09 full-project code review plus four issues live-debugged during the alpha2 soak (DWD mask architecture, coverage clipping, rate-limit recovery, lightning-backlog UI freeze). No new features, no config surface changes. **Not recommended for production dashboards** — install to exercise the fixes and report findings.
@@ -779,6 +786,7 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
+[Unreleased]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha3...HEAD
 [3.7.0-alpha3]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha2...v3.7.0-alpha3
 [3.7.0-alpha2]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha1...v3.7.0-alpha2
 [3.7.0-alpha1]: https://github.com/jpettitt/weather-radar-card/compare/v3.6.5...v3.7.0-alpha1
