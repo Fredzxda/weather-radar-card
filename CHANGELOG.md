@@ -5,13 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.7.0-beta2] - 2026-06-12
+
+> **Beta pre-release.** One scoped feature exception to the beta freeze, reopened deliberately: the NOAA source switch below — it directly resolves live beta feedback ("frame increment is 10 instead of 5") and removes the line's biggest data-freshness deficit. Plus the "Latest" label rename and a full translation catch-up. Everything else remains fixes-only until 3.7.0.
 
 ### Changed
 
 - **NOAA radar now serves from NCEP's opengeo GeoServer** (`opengeo.ncep.noaa.gov`, `conus_bref_qcd` — the backend radar.weather.gov itself runs on), replacing the eventdriven `mapservices.weather.noaa.gov` WMS. The new server's `GetCapabilities` lists the layer's **actual frame timestamps** (real ~2-min scan cadence) and is CORS-open, so the card now requests exact scan times instead of guessing a grid. What users see: the newest NOAA frame is **~2 minutes behind real time instead of 15–25**, every frame in the loop is a distinct radar scan (the alpha2 "duplicate frames" trade-off is gone), and a new **Frame interval** editor dropdown picks 2 / 5 / 10-minute loop density (default 5 — restoring the 3.6-era 12–13 frames/hour, with genuinely unique frames this time; directly addresses the beta1 "frame increment is 10 instead of 5" feedback). Legacy `frame_count` configs now migrate on the 5-min default stride again (a 3.6-era `frame_count: 12` covers ~55 min as it used to). The refresh cycle scales with the chosen interval so a 2-min loop stays 2-min fresh. The NWS colour bar asset was regenerated to match the new product's modern reflectivity ramp (sampled from the server's own legend). If the frame listing is unavailable the card falls back to the legacy server's computed grid for that cycle (stale but correct) and retries; `_dedupFrames` stays armed as belt-and-braces. The card-side NOAA rate budget was raised 120 → 500 req/min (matching RainViewer/DWD) — the old number was sized for the small legacy host, and the worst-case init burst (120-min loop at the 2-min interval ≈ 490 tile requests, one-time) would have spent minutes visibly throttled against a backend built for radar.weather.gov's public traffic.
 
-- **The newest-frame label now reads "Latest" instead of "Now"** (progress-bar tooltip and the time-display suffix). "Now" overstated freshness — radar frames lag real time by source (NOAA's newest frame is ~15–20 min old, measured; DWD ~5 min; RainViewer ~1–2 min). Localised in all 11 languages.
+- **The newest-frame label now reads "Latest" instead of "Now"** (progress-bar tooltip and the time-display suffix). "Now" overstated freshness — radar frames lag real time by source (DWD ~5 min; RainViewer ~1–2 min; NOAA was ~15–20 min on the legacy server, now ~2 min after the opengeo switch above — the label stays honest either way). Localised in all 11 languages.
 - **Translations brought up to date**: the 3.7 editor strings (playback speed block, per-user persistence, motion compensation) shipped in English in all 10 non-English locales — now properly translated (de, es, fr, it, nb, nl, pl, pt_BR, sk, sv), plus unit-name fixes where the language has its own word for acres (it: Acri, pl: Akry, sk: Akre).
 
 ## [3.7.0-beta1] - 2026-06-10
@@ -797,7 +799,7 @@ Multi-marker overhaul. **Breaking:** single-marker config fields (`show_marker`,
 
 For changes in versions prior to 2.0.4, please refer to the git commit history.
 
-[Unreleased]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-beta1...HEAD
+[3.7.0-beta2]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-beta1...v3.7.0-beta2
 [3.7.0-beta1]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha3...v3.7.0-beta1
 [3.7.0-alpha3]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha2...v3.7.0-alpha3
 [3.7.0-alpha2]: https://github.com/jpettitt/weather-radar-card/compare/v3.7.0-alpha1...v3.7.0-alpha2
