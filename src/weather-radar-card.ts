@@ -96,7 +96,7 @@ import {
   resolveCoordinatePair,
 } from './coordinate-utils';
 import { createMarkerIconForMarker, HOME_PATH } from './marker-icon';
-import { migrateConfig, resolveMarkerPosition, resolveTracking } from './marker-utils';
+import { migrateConfig, frameCountIsOverridden, resolveMarkerPosition, resolveTracking } from './marker-utils';
 import { WildfireLayer } from './wildfire-layer';
 import { NwsAlertsLayer } from './nws-alerts-layer';
 import { LightningLayer } from './lightning-layer';
@@ -127,6 +127,11 @@ console.info(
   preview: true,
   documentationURL: 'https://github.com/jpettitt/weather-radar-card',
 });
+
+// Once-per-page-session guard for the frame_count over-determined config
+// warning (issue #191). Module-level so it survives card teardown/rebuild
+// and is shared across every card instance — see _migrateConfig.
+let frameCountOverdeterminedWarned = false;
 
 @customElement('weather-radar-card')
 export class WeatherRadarCard extends LitElement implements LovelaceCard {
@@ -422,6 +427,26 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
   }
 
   private _migrateConfig(config: WeatherRadarCardConfig): WeatherRadarCardConfig {
+    // Over-determined time-range config (issue #191): frame_count is
+    // silently ignored once a time-based field is present (migrateTimeRange
+    // only consumes it when past_minutes is absent). A config carrying both
+    // — e.g. frame_count: 12 + past_minutes: 60 + frame_stride_minutes: 2 —
+    // reads as self-contradictory but runs purely on the time fields, so
+    // tell the user frame_count is doing nothing.
+    //
+    // setConfig (hence this wrapper) runs on EVERY editor keystroke via the
+    // preview card, and the editor never strips frame_count, so an
+    // unguarded warn would spam the console once per character typed. Gate
+    // on a module-level once-flag so the deprecation nudge logs a single
+    // time per page session regardless of edit churn.
+    if (!frameCountOverdeterminedWarned && frameCountIsOverridden(config)) {
+      frameCountOverdeterminedWarned = true;
+      console.warn(
+        '[weather-radar-card] frame_count is deprecated and ignored when '
+        + 'past_minutes or frame_stride_minutes is set — your loop is controlled '
+        + 'by those. Remove frame_count to silence this warning.',
+      );
+    }
     const result = migrateConfig(config);
     if (result !== config) {
       // Only warn when legacy fields were actually present — not for the
