@@ -128,6 +128,11 @@ console.info(
   documentationURL: 'https://github.com/jpettitt/weather-radar-card',
 });
 
+// Once-per-page-session guard for the frame_count over-determined config
+// warning (issue #191). Module-level so it survives card teardown/rebuild
+// and is shared across every card instance — see _migrateConfig.
+let frameCountOverdeterminedWarned = false;
+
 @customElement('weather-radar-card')
 export class WeatherRadarCard extends LitElement implements LovelaceCard {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
@@ -427,11 +432,15 @@ export class WeatherRadarCard extends LitElement implements LovelaceCard {
     // only consumes it when past_minutes is absent). A config carrying both
     // — e.g. frame_count: 12 + past_minutes: 60 + frame_stride_minutes: 2 —
     // reads as self-contradictory but runs purely on the time fields, so
-    // tell the user frame_count is doing nothing. Kept in this runtime
-    // wrapper (not the shared migrateConfig) so it fires on card load, not
-    // on every editor keystroke — same placement as the single-marker
-    // warning below.
-    if (frameCountIsOverridden(config)) {
+    // tell the user frame_count is doing nothing.
+    //
+    // setConfig (hence this wrapper) runs on EVERY editor keystroke via the
+    // preview card, and the editor never strips frame_count, so an
+    // unguarded warn would spam the console once per character typed. Gate
+    // on a module-level once-flag so the deprecation nudge logs a single
+    // time per page session regardless of edit churn.
+    if (!frameCountOverdeterminedWarned && frameCountIsOverridden(config)) {
+      frameCountOverdeterminedWarned = true;
       console.warn(
         '[weather-radar-card] frame_count is deprecated and ignored when '
         + 'past_minutes or frame_stride_minutes is set — your loop is controlled '

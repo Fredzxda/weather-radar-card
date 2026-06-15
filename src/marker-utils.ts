@@ -46,7 +46,9 @@ function migrateTimeRange(config: WeatherRadarCardConfig): WeatherRadarCardConfi
  * silent no-op that reads as a self-contradictory config to the user
  * (issue #191). Pure predicate so the card can warn without duplicating
  * the precedence rule; the warning itself lives in the card's runtime
- * `_migrateConfig` wrapper so it fires on load, not per editor keystroke.
+ * `_migrateConfig` wrapper, which runs per setConfig (every editor
+ * keystroke via the preview card) and so gates the log behind a
+ * once-per-session flag.
  */
 export function frameCountIsOverridden(config: WeatherRadarCardConfig): boolean {
   return config.frame_count !== undefined
