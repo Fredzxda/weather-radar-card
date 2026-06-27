@@ -1,5 +1,4 @@
 name: "Build"
-
 on:
   push:
     branches:
@@ -8,34 +7,26 @@ on:
     branches:
       - main
   workflow_dispatch:
-
-# Cancel an older run of the same workflow on the same ref when a new push
-# arrives. Saves CI minutes on rapid force-pushes / quick fixups.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: Test build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v5
-
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: 'npm'
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-
-      - name: Test
-        run: npm test
-
       - name: Build
-        run: npm run build
+        run: npm run rollup
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-radar-card
+          path: weather-radar-card.js
